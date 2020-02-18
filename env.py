@@ -3,17 +3,9 @@ import gym
 from gym import spaces
 import ctypes
 import json
+import os
 
-
-price_mean = 2.687332e+04
-price_max = 2.854000e+04
-volume_mean = 5.847698e+04
-volume_max = 2.052790e+05
-target_mean = 2.942739e+00
-target_max = 3.390000e+02
-price_filter = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23, 24, 28, 30, 32, 34, 36, 38]
-volume_filter = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 22, 29, 31, 33, 35, 37, 39]
-target_filter = [26, 27]
+os.chdir("/home/shuai/trading-game/game")
 
 
 class TradingEnv(gym.Env):
@@ -22,7 +14,7 @@ class TradingEnv(gym.Env):
         super(TradingEnv, self).__init__()
         print(__file__)
 
-        so_file = "game.so"
+        so_file = "./game.so"
         self.game_so = ctypes.cdll.LoadLibrary(so_file)
         arr_len = 100
         arr1 = ctypes.c_int * arr_len
@@ -81,11 +73,23 @@ class TradingEnv(gym.Env):
         return obs, reward, done, info
 
     def _get_obs(self, raw_obs):
+        price_mean = 26867.75
+        price_max = 28540.0
+        volume_mean = 5.847698e+04
+        volume_max = 2.052790e+05
+        target_mean = 2.942739e+00
+        target_max = 3.390000e+02
+        price_filter = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23, 24, 28, 30, 32, 34, 36, 38]
+        volume_filter = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 22, 29, 31, 33, 35, 37, 39]
+        target_filter = [26, 27]
         obs = np.array(raw_obs[:40], dtype=np.float32)
         obs[price_filter] = (obs[price_filter]-price_mean) / (price_max-price_mean)
         obs[volume_filter] = (obs[volume_filter] - volume_mean) / (volume_max - volume_mean)
         obs[target_filter] = (obs[target_filter] - target_mean) / (target_max - target_mean)
         obs = np.delete(obs, [0, 25])
+        obs[obs < -1] = -1
+        obs[obs > 1] = 1
+
         return obs
 
     def render(self):
