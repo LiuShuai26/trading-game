@@ -68,7 +68,7 @@ class TradingEnv(gym.Env):
 
         if self.debug:
             print(start_info)
-            # print("Target_Num", self.raw_obs[26], "Actual_Num", self.raw_obs[27])
+            print("Target_Num", self.raw_obs[26], "Actual_Num", self.raw_obs[27])
         if self.render:
             self.rendering()
         # here obs should be a numpy array float32 to make it more general (in case we want to use continuous actions)
@@ -78,17 +78,17 @@ class TradingEnv(gym.Env):
         if action_index < self.n_actions:
             self.game_so.Action(self.ctx, self.actions[action_index])
         else:
-            raise ValueError("Received invalid action={} which is not part of the action space".format(action))
+            raise ValueError("Received invalid action={} which is not part of the action space".format(action_index))
 
         self.game_so.Step(self.ctx)
 
         self.game_so.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.game_so.GetReward(self.ctx, self.rewards, self.rewards_len)
-        # if self.debug:
-        #     print(self.rewards_len[0])
-        #     print(self.rewards[1], self.rewards[2])
-        #     print("Target_Num", self.raw_obs[26], "Actual_Num", self.raw_obs[27])
-        #     print("score:", self.rewards[0])
+        if self.debug:
+            # print(self.rewards_len[0])
+            # print(self.rewards[1], self.rewards[2])
+            print("Target_Num", self.raw_obs[26], "Actual_Num", self.raw_obs[27])
+            # print("score:", self.rewards[0])
         obs = self._get_obs(self.raw_obs)
 
         done = bool(self.raw_obs[0])
@@ -120,6 +120,7 @@ class TradingEnv(gym.Env):
         total_volume_filter = [22]
         target_filter = [26, 27]
         obs = np.array(raw_obs[:40], dtype=np.float32)
+
         obs[price_filter] = (obs[price_filter] - price_mean) / (price_max - price_mean)
         obs[bid_ask_volume_filter] = (obs[bid_ask_volume_filter] - bid_ask_volume_mean) / (
                 bid_ask_volume_max - bid_ask_volume_mean)
@@ -169,7 +170,8 @@ class TradingEnv(gym.Env):
 #     # for i in range(1, 63):
 #     while True:
 #         cnt += 1
-#         obs = env.reset(render=True, debug=True)
+#         # obs = env.reset(render=True, debug=True)
+#         obs = env.reset(debug=True)
 #         step = 1
 #         while True:
 #             action = env.action_space.sample()
@@ -182,16 +184,13 @@ class TradingEnv(gym.Env):
 #             # print("Action: ", action)
 #             print(step, "=======")
 #             obs, reward, done, info = env.step(action)
+#             # print(obs)
 #             # print('profit=', info['profit'], 'total_profit=', info['total_profit'])
 #             step += 1
-#             time.sleep(1)
+#             # time.sleep(1)
 #             # print('obs=', obs, 'reward=', reward, 'done=', done)
 #             # print('reward=', reward, 'profit=', info['profit'])
 #
 #             if done or step == 1000:
 #                 print("Done!", cnt)
 #                 break
-# while True:
-#     cnt += 1
-#     obs = env.reset()
-#     print(cnt)
