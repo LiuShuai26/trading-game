@@ -79,12 +79,14 @@ for start_day in range(1, 63):
 
         expso.GetInfo(ctx, infos, infos_len)
         expso.GetReward(ctx, rewards, rewards_len)
+
         info_dict = {}
         for i in range(40):
             info_dict[info_names[i]] = infos[i]
-        all_data.append(info_dict)
         for i in range(3):
             info_dict[info_names[i + 40]] = rewards[i]
+        all_data.append(info_dict)
+
         done = infos[0]
         if done == 1:
             print(infos[25], step)
@@ -94,3 +96,5 @@ for start_day in range(1, 63):
         step += 1
 print(len(all_data))
 all_data_df = pd.DataFrame(all_data)
+print(all_data_df.info())
+all_data_df.to_csv("/home/shuai/day_1-62.csv", index=False)

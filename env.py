@@ -4,9 +4,18 @@ from gym import spaces
 import ctypes
 import json
 import os
+import pandas as pd
 import time
 
 os.chdir("/home/shuai/trading-game/rl_game/game")
+
+info_names = ["Done", "LastPrice", "BidPrice1", "BidVolume1", "AskPrice1", "AskVolume1", "BidPrice2", "BidVolume2",
+              "AskPrice2", "AskVolume2", "BidPrice3", "BidVolume3", "AskPrice3", "AskVolume3", "BidPrice4",
+              "BidVolume4", "AskPrice4", "AskVolume4", "BidPrice5", "BidVolume5", "AskPrice5", "AskVolume5", "Volume",
+              "HighestPrice", "LowestPrice", "TradingDay", "Target_Num", "Actual_Num", "AliveBidPrice1",
+              "AliveBidVolume1", "AliveBidPrice2", "AliveBidVolume2", "AliveBidPrice3", "AliveBidVolume3",
+              "AliveAskPrice1", "AliveAskVolume1", "AliveAskPrice2", "AliveAskVolume2", "AliveAskPrice3",
+              "AliveAskVolume3", "score ", "profit", "total_profit", "action", "designed_reward"]
 
 data_len = [225016, 225018, 88391, 504024, 225018, 225017, 225018, 225016, 22501, 225016, 225016, 225016, 225018,
             225015, 225018, 16379, 177490, 225016, 225018, 225016, 225016, 225016, 225018,
@@ -41,9 +50,10 @@ class TradingEnv(gym.Env):
         self.observation_space = spaces.Box(low=-1, high=1, shape=(38,), dtype=np.float32)
         self.max_ep_len = 1000
         self.render = False
-        self.debug = False
+        self.analyse = False
+        self.all_data = []
 
-    def reset(self, start_day=None, skip_step=None, render=False, debug=False):
+    def reset(self, start_day=None, skip_step=None, render=False, analyse=False):
         """
         Important: the observation must be a numpy array
         :return: (np.array)
@@ -51,11 +61,12 @@ class TradingEnv(gym.Env):
 
         # np.random.seed(seed)
         self.render = render
-        self.debug = debug
+        self.analyse = analyse
+        self.all_data = []
         if not start_day:
             start_day = np.random.randint(1, 63, 1)[0]
         if skip_step is None:
-            data_len_index = start_day-1
+            data_len_index = start_day - 1
             skip_step = int(np.random.randint(0, data_len[data_len_index] - self.max_ep_len, 1)[0])
         start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": skip_step}
         if self.ctx:
@@ -66,9 +77,8 @@ class TradingEnv(gym.Env):
 
         obs = self._get_obs(self.raw_obs)
 
-        if self.debug:
-            print(start_info)
-            print("Target_Num", self.raw_obs[26], "Actual_Num", self.raw_obs[27])
+        if self.analyse:
+            self._append_one_step_data()
         if self.render:
             self.rendering()
         # here obs should be a numpy array float32 to make it more general (in case we want to use continuous actions)
@@ -84,11 +94,7 @@ class TradingEnv(gym.Env):
 
         self.game_so.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.game_so.GetReward(self.ctx, self.rewards, self.rewards_len)
-        if self.debug:
-            # print(self.rewards_len[0])
-            # print(self.rewards[1], self.rewards[2])
-            print("Target_Num", self.raw_obs[26], "Actual_Num", self.raw_obs[27])
-            # print("score:", self.rewards[0])
+
         obs = self._get_obs(self.raw_obs)
 
         done = bool(self.raw_obs[0])
@@ -97,14 +103,17 @@ class TradingEnv(gym.Env):
         profit = self.rewards[1]
 
         target_bias = abs(self.raw_obs[26] - self.raw_obs[27])
-        # reward = -score - target_bias  # score smaller better, target_bias smaller better.
-        reward = -target_bias
+        # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
+        designed_reward = -target_bias
         # Optionally we can pass additional info, we are not using that for now
         info = {"TradingDay": self.raw_obs[25], "profit": profit}
+
+        if self.analyse:
+            self._append_one_step_data(action=action_index, designed_reward=designed_reward)
         if self.render:
             self.rendering(action_index)
 
-        return obs, reward, done, info
+        return obs, designed_reward, done, info
 
     def _get_obs(self, raw_obs):
         price_mean = 26867.75
@@ -132,6 +141,16 @@ class TradingEnv(gym.Env):
         obs[obs > 1] = 1
 
         return obs
+
+    def _append_one_step_data(self, action=None, designed_reward=None):
+        info_dict = {}
+        for i in range(40):
+            info_dict[info_names[i]] = self.raw_obs[i]
+        for i in range(3):
+            info_dict[info_names[i + 40]] = self.rewards[i]
+        info_dict[info_names[43]] = action
+        info_dict[info_names[44]] = designed_reward
+        self.all_data.append(info_dict)
 
     def rendering(self, action=None):
         print("-----------------------")
@@ -161,36 +180,38 @@ class TradingEnv(gym.Env):
     def close(self):
         self.game_so.ReleaseContext(self.ctx)
 
+env = TradingEnv()
 
-# env = TradingEnv()
-#
-# cnt = 0
-#
-# while True:
-#     # for i in range(1, 63):
-#     while True:
-#         cnt += 1
-#         # obs = env.reset(render=True, debug=True)
-#         obs = env.reset(debug=True)
-#         step = 1
-#         while True:
-#             action = env.action_space.sample()
-#             # action = 0
-#             # if step < 100000:
-#             #     action = 3
-#             # else:
-#             #     action = 0
-#             # print("Step {}".format(step))
-#             # print("Action: ", action)
-#             print(step, "=======")
-#             obs, reward, done, info = env.step(action)
-#             # print(obs)
-#             # print('profit=', info['profit'], 'total_profit=', info['total_profit'])
-#             step += 1
-#             # time.sleep(1)
-#             # print('obs=', obs, 'reward=', reward, 'done=', done)
-#             # print('reward=', reward, 'profit=', info['profit'])
-#
-#             if done or step == 1000:
-#                 print("Done!", cnt)
-#                 break
+cnt = 0
+
+while True:
+    # for i in range(1, 63):
+    while True:
+        cnt += 1
+        # obs = env.reset(render=True, analyse=True)
+        obs = env.reset(analyse=True)
+        step = 1
+        while True:
+            action = env.action_space.sample()
+            # action = 0
+            # if step < 100000:
+            #     action = 3
+            # else:
+            #     action = 0
+            # print("Step {}".format(step))
+            # print("Action: ", action)
+            # print(step, "=======")
+            obs, reward, done, info = env.step(action)
+            # print(obs)
+            # print('profit=', info['profit'], 'total_profit=', info['total_profit'])
+            step += 1
+            # time.sleep(1)
+            # print('obs=', obs, 'reward=', reward, 'done=', done)
+            # print('reward=', reward, 'profit=', info['profit'])
+
+            if done or step == 100:
+                print("Done!", cnt)
+                all_data = env.all_data
+                all_data_df = pd.DataFrame(all_data)
+                print(all_data_df.tail())
+                break
