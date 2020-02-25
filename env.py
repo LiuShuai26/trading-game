@@ -15,7 +15,7 @@ info_names = ["Done", "LastPrice", "BidPrice1", "BidVolume1", "AskPrice1", "AskV
               "HighestPrice", "LowestPrice", "TradingDay", "Target_Num", "Actual_Num", "AliveBidPrice1",
               "AliveBidVolume1", "AliveBidPrice2", "AliveBidVolume2", "AliveBidPrice3", "AliveBidVolume3",
               "AliveAskPrice1", "AliveAskVolume1", "AliveAskPrice2", "AliveAskVolume2", "AliveAskPrice3",
-              "AliveAskVolume3", "score ", "profit", "total_profit", "action", "designed_reward"]
+              "AliveAskVolume3", "score", "profit", "total_profit", "action", "designed_reward"]
 
 data_len = [225016, 225018, 88391, 504024, 225018, 225017, 225018, 225016, 22501, 225016, 225016, 225016, 225018,
             225015, 225018, 16379, 177490, 225016, 225018, 225016, 225016, 225016, 225018,
@@ -180,38 +180,41 @@ class TradingEnv(gym.Env):
     def close(self):
         self.game_so.ReleaseContext(self.ctx)
 
-# env = TradingEnv()
-#
-# cnt = 0
-#
-# while True:
-#     # for i in range(1, 63):
-#     while True:
-#         cnt += 1
-#         # obs = env.reset(render=True, analyse=True)
-#         obs = env.reset(analyse=True)
-#         step = 1
-#         while True:
-#             action = env.action_space.sample()
-#             # action = 0
-#             # if step < 100000:
-#             #     action = 3
-#             # else:
-#             #     action = 0
-#             # print("Step {}".format(step))
-#             # print("Action: ", action)
-#             # print(step, "=======")
-#             obs, reward, done, info = env.step(action)
-#             # print(obs)
-#             # print('profit=', info['profit'], 'total_profit=', info['total_profit'])
-#             step += 1
-#             # time.sleep(1)
-#             # print('obs=', obs, 'reward=', reward, 'done=', done)
-#             # print('reward=', reward, 'profit=', info['profit'])
-#
-#             if done or step == 100:
-#                 print("Done!", cnt)
-#                 all_data = env.all_data
-#                 all_data_df = pd.DataFrame(all_data)
-#                 print(all_data_df.tail())
-#                 break
+
+if __name__ == "__main__":
+
+    env = TradingEnv()
+
+    cnt = 0
+
+    while True:
+        # for i in range(1, 63):
+        while True:
+            cnt += 1
+            # obs = env.reset(render=True, analyse=True)
+            obs = env.reset(analyse=True)
+            step = 1
+            while True:
+                action = env.action_space.sample()
+                # action = 0
+                # if step < 100000:
+                #     action = 3
+                # else:
+                #     action = 0
+                # print("Step {}".format(step))
+                # print("Action: ", action)
+                # print(step, "=======")
+                obs, reward, done, info = env.step(action)
+                # print(obs)
+                # print('profit=', info['profit'], 'total_profit=', info['total_profit'])
+                step += 1
+                # time.sleep(1)
+                # print('obs=', obs, 'reward=', reward, 'done=', done)
+                # print('reward=', reward, 'profit=', info['profit'])
+
+                if done or step == 100:
+                    print("Done!", cnt)
+                    all_data = env.all_data
+                    all_data_df = pd.DataFrame(all_data)
+                    print(all_data_df.tail())
+                    break
