@@ -9,20 +9,23 @@ import time
 
 os.chdir("/home/shuai/trading-game/rl_game/game")
 
-info_names = ["Done", "LastPrice", "BidPrice1", "BidVolume1", "AskPrice1", "AskVolume1", "BidPrice2", "BidVolume2",
-              "AskPrice2", "AskVolume2", "BidPrice3", "BidVolume3", "AskPrice3", "AskVolume3", "BidPrice4",
-              "BidVolume4", "AskPrice4", "AskVolume4", "BidPrice5", "BidVolume5", "AskPrice5", "AskVolume5", "Volume",
-              "HighestPrice", "LowestPrice", "TradingDay", "Target_Num", "Actual_Num", "AliveBidPrice1",
-              "AliveBidVolume1", "AliveBidPrice2", "AliveBidVolume2", "AliveBidPrice3", "AliveBidVolume3",
-              "AliveAskPrice1", "AliveAskVolume1", "AliveAskPrice2", "AliveAskVolume2", "AliveAskPrice3",
-              "AliveAskVolume3", "score", "profit", "total_profit", "action", "designed_reward"]
+info_names = [
+    "Done", "LastPrice", "BidPrice1", "BidVolume1", "AskPrice1", "AskVolume1", "BidPrice2", "BidVolume2",
+    "AskPrice2", "AskVolume2", "BidPrice3", "BidVolume3", "AskPrice3", "AskVolume3", "BidPrice4",
+    "BidVolume4", "AskPrice4", "AskVolume4", "BidPrice5", "BidVolume5", "AskPrice5", "AskVolume5", "Volume",
+    "HighestPrice", "LowestPrice", "TradingDay", "Target_Num", "Actual_Num", "AliveBidPrice1",
+    "AliveBidVolume1", "AliveBidPrice2", "AliveBidVolume2", "AliveBidPrice3", "AliveBidVolume3",
+    "AliveAskPrice1", "AliveAskVolume1", "AliveAskPrice2", "AliveAskVolume2", "AliveAskPrice3",
+    "AliveAskVolume3", "score", "profit", "total_profit", "action", "designed_reward"
+]
 
-data_len = [225016, 225018, 88391, 504024, 225018, 225017, 225018, 225016, 22501, 225016, 225016, 225016, 225018,
-            225015, 225018, 16379, 177490, 225016, 225018, 225016, 225016, 225016, 225018,
-            225016, 225018, 372414, 225016, 225016, 225016, 225018, 225018, 225016, 225016, 265205, 225016, 225016,
-            225018, 225016, 225016, 225015, 225016, 225016, 225016, 225016, 192623, 225018,
-            247995, 225016, 225016, 225016, 225016, 225018, 99198, 225018, 225016, 225016, 225016, 225016, 99006,
-            225016, 225018, 99010, ]
+data_len = [
+    225016, 225018, 225018, 225018, 225018, 225017, 225018, 225016, 225014, 225016, 225016, 225018, 225018, 225015,
+    225018, 225016, 177490, 225016, 225018, 225016, 225016, 225016, 225018, 225016, 225018, 225018, 225016, 225016,
+    225016, 225018, 225018, 225016, 225016, 225018, 225016, 225016, 225018, 225016, 225016, 225015, 225016, 225016,
+    225016, 225016, 192623, 225018, 225018, 225016, 225016, 225016, 225016, 225018, 225016, 225018, 225016, 225016,
+    225016, 225016, 99006, 225016, 225018, 99010
+]
 
 
 class TradingEnv(gym.Env):
@@ -52,6 +55,7 @@ class TradingEnv(gym.Env):
         self.render = False
         self.analyse = False
         self.all_data = []
+        self.obs = None
 
     def reset(self, start_day=None, skip_step=None, render=False, analyse=False):
         """
@@ -75,14 +79,14 @@ class TradingEnv(gym.Env):
         self.game_so.GetActions(self.ctx, self.actions, self.action_len)
         self.game_so.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
 
-        obs = self._get_obs(self.raw_obs)
+        self.obs = self._get_obs(self.raw_obs)
 
         if self.analyse:
             self._append_one_step_data()
         if self.render:
             self.rendering()
         # here obs should be a numpy array float32 to make it more general (in case we want to use continuous actions)
-        return obs
+        return self.obs
 
     def step(self, action_index):
         if action_index < self.n_actions:
@@ -95,7 +99,7 @@ class TradingEnv(gym.Env):
         self.game_so.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.game_so.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self._get_obs(self.raw_obs)
+        self.obs = self._get_obs(self.raw_obs)
 
         done = bool(self.raw_obs[0])
 
@@ -113,16 +117,16 @@ class TradingEnv(gym.Env):
         if self.render:
             self.rendering(action_index)
 
-        return obs, designed_reward, done, info
+        return self.obs, designed_reward, done, info
 
     def _get_obs(self, raw_obs):
-        price_mean = 26863.36
+        price_mean = 26871.05
         price_max = 28540.0
-        bid_ask_volume_mean = 8.65
+        bid_ask_volume_mean = 8.77
         bid_ask_volume_max = 620.0
-        total_volume_mean = 58283.69
-        total_volume_max = 205279.0
-        target_mean = 15.48
+        total_volume_mean = 56871.13
+        total_volume_max = 175383.0
+        target_mean = 20.69
         target_max = 485.0
         price_filter = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23, 24, 28, 30, 32, 34, 36, 38]
         bid_ask_volume_filter = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 29, 31, 33, 35, 37, 39]
@@ -136,6 +140,12 @@ class TradingEnv(gym.Env):
         obs[total_volume_filter] = (obs[total_volume_filter] - total_volume_mean) / (
                 total_volume_max - total_volume_mean)
         obs[target_filter] = (obs[target_filter] - target_mean) / (target_max - target_mean)
+
+        # obs[price_filter] = (obs[price_filter] - price_mean) / price_max
+        # obs[bid_ask_volume_filter] = (obs[bid_ask_volume_filter] - bid_ask_volume_mean) / bid_ask_volume_max
+        # obs[total_volume_filter] = (obs[total_volume_filter] - total_volume_mean) / total_volume_max
+        # obs[target_filter] = (obs[target_filter] - target_mean) / target_max
+
         obs = np.delete(obs, [0, 25])
         obs[obs < -1] = -1
         obs[obs > 1] = 1
@@ -146,6 +156,12 @@ class TradingEnv(gym.Env):
         info_dict = {}
         for i in range(40):
             info_dict[info_names[i]] = self.raw_obs[i]
+
+        obs_names = info_names.copy()
+        del obs_names[25]
+        del obs_names[0]
+        for i in range(38):
+            info_dict[obs_names[i]+"_n"] = self.obs[i]
         for i in range(3):
             info_dict[info_names[i + 40]] = self.rewards[i]
         info_dict[info_names[43]] = action
@@ -193,24 +209,13 @@ if __name__ == "__main__":
             cnt += 1
             # obs = env.reset(render=True, analyse=True)
             obs = env.reset(analyse=True)
+
             step = 1
             while True:
                 action = env.action_space.sample()
-                # action = 0
-                # if step < 100000:
-                #     action = 3
-                # else:
-                #     action = 0
-                # print("Step {}".format(step))
-                # print("Action: ", action)
-                # print(step, "=======")
+
                 obs, reward, done, info = env.step(action)
-                # print(obs)
-                # print('profit=', info['profit'], 'total_profit=', info['total_profit'])
                 step += 1
-                # time.sleep(1)
-                # print('obs=', obs, 'reward=', reward, 'done=', done)
-                # print('reward=', reward, 'profit=', info['profit'])
 
                 if done or step == 100:
                     print("Done!", cnt)

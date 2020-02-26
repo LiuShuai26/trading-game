@@ -58,7 +58,7 @@ info_names = [
 
 all_data = []
 
-for start_day in range(12, 13):
+for start_day in range(1, 63):
 
     arr_len = 100
     arr1 = ctypes.c_int * arr_len
@@ -73,7 +73,7 @@ for start_day in range(12, 13):
 
     start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": 0}
     ctx = expso.CreateContext(json.dumps(start_info).encode())
-    print(start_info)
+    # print(start_info)
 
     step = 1
     while True:
@@ -81,7 +81,7 @@ for start_day in range(12, 13):
         expso.GetInfo(ctx, infos, infos_len)
         expso.GetReward(ctx, rewards, rewards_len)
 
-        print(infos[1], infos[23])
+        # print(infos[1], infos[23])
         # info_dict = {}
         # for i in range(40):
         #     info_dict[info_names[i]] = infos[i]
@@ -91,11 +91,12 @@ for start_day in range(12, 13):
 
         done = infos[0]
         if done == 1:
-            print(infos[25], step)
+            print(step, end=",")
             expso.ReleaseContext(ctx)
             break
         expso.Step(ctx)
         step += 1
+
 # print(len(all_data))
 # all_data_df = pd.DataFrame(all_data)
 # print(all_data_df.info())
