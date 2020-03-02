@@ -1,5 +1,8 @@
 import pandas as pd
 import env
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 env = env.TradingEnv()
 
@@ -7,27 +10,34 @@ env = env.TradingEnv()
 targets = []
 acts = []
 
-for i in range(1):
-    obs = env.reset(start_day=1, skip_step=10000, analyse=True)
+for i in range(20):
+    obs = env.reset()
     step = 1
+    score = []
     while True:
         # action = env.action_space.sample()
 
-        if obs[24] > obs[25]:
-            action = 7
-        elif obs[24] < obs[25]:
-            action = 8
-        else:
-            action = 0
-
+        # if obs[24] > obs[25]:
+        #     action = 7
+        # elif obs[24] < obs[25]:
+        #     action = 8
+        # else:
+        #     action = 0
+        action = 0
         obs, reward, done, info = env.step(action)
         step += 1
+        score.append(info['score'])
 
         # if done:
         if done or step == 1000:
-            all_data = env.all_data
-            all_data_df = pd.DataFrame(all_data)
-            print(all_data_df.tail())
-            all_data_df.to_csv("/home/shuai/e-day1-780a-1000s.csv", index=False)
-            print("data save!")
+            # all_data = env.all_data
+            # all_data_df = pd.DataFrame(all_data)
+            # print(all_data_df.describe()['score'].iloc[7])
+            score = np.array(score)
+            plt.plot(score)
+            plt.show()
+            # print(all_data_df.tail())
+            # all_data_df.to_csv("/home/shuai/day1-078-action.csv", index=False)
+            # all_data_df.to_csv("/home/shuai/day1-078-action.csv", index=True)
+            # print("data save!")
             break

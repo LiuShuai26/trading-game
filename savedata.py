@@ -42,6 +42,7 @@ info_names = [
     "AliveBidPrice2",
     "AliveBidVolume2",
     "AliveBidPrice3",
+
     "AliveBidVolume3",
     "AliveAskPrice1",
     "AliveAskVolume1",
@@ -49,16 +50,23 @@ info_names = [
     "AliveAskVolume2",
     "AliveAskPrice3",
     "AliveAskVolume3",
+
     "score",
     "profit",
     "total_profit",
     "action",
     "reward"
 ]
+count = [
+    "AliveBidPriceNUM",
+    "AliveBidVolumeNUM",
+    "AliveAskPriceNUM",
+    "AliveAskVolumeNUM",
+]
 
 all_data = []
 
-for start_day in range(1, 63):
+for start_day in range(1, 2):
 
     arr_len = 100
     arr1 = ctypes.c_int * arr_len
@@ -71,7 +79,7 @@ for start_day in range(1, 63):
     rewards = arr1()
     rewards_len = arr()
 
-    start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": 0}
+    start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": 10000}
     ctx = expso.CreateContext(json.dumps(start_info).encode())
     # print(start_info)
 
@@ -80,8 +88,9 @@ for start_day in range(1, 63):
 
         expso.GetInfo(ctx, infos, infos_len)
         expso.GetReward(ctx, rewards, rewards_len)
-
+        print(infos[34], infos[35], infos[42], infos[43])
         # print(infos[1], infos[23])
+
         # info_dict = {}
         # for i in range(40):
         #     info_dict[info_names[i]] = infos[i]
@@ -90,14 +99,16 @@ for start_day in range(1, 63):
         # all_data.append(info_dict)
 
         done = infos[0]
-        if done == 1:
-            print(step, end=",")
+        if done == 1 or step == 1000:
+            print("step:", step)
             expso.ReleaseContext(ctx)
             break
+
         expso.Step(ctx)
         step += 1
 
 # print(len(all_data))
 # all_data_df = pd.DataFrame(all_data)
 # print(all_data_df.info())
-# all_data_df.to_csv("/home/shuai/day_1-62.csv", index=False)
+# all_data_df.to_csv("/home/shuai/day_1_no_action.csv", index=False)
+print("Done!")

@@ -38,6 +38,7 @@ env = TradingEnv()
 
 logger = EpochLogger()
 o, r, d, ep_ret, ep_len, n = env.reset(start_day=1, skip_step=10000, analyse=True), 0, False, 0, 0, 0
+# o, r, d, ep_ret, ep_len, n = env.reset(), 0, False, 0, 0, 0
 while n < num_episodes:
 
     a = get_action(o)
@@ -48,12 +49,14 @@ while n < num_episodes:
     if d or (ep_len == max_ep_len):
         logger.store(EpRet=ep_ret, EpLen=ep_len)
         print('Episode %d \t EpRet %.3f \t EpLen %d' % (n, ep_ret, ep_len))
+
         all_data = env.all_data
         all_data_df = pd.DataFrame(all_data)
         print(all_data_df.tail())
         all_data_df.to_csv("/home/shuai/day1-test-target.csv", index=False)
         print("data save!")
         break
+
         o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
         n += 1
 

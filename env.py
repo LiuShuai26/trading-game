@@ -4,6 +4,7 @@ from gym import spaces
 import ctypes
 import json
 import os
+from collections import deque
 import pandas as pd
 import time
 
@@ -56,6 +57,7 @@ class TradingEnv(gym.Env):
         self.analyse = False
         self.all_data = []
         self.obs = None
+        self.target_diff = deque(maxlen=10)
 
     def reset(self, start_day=None, skip_step=None, render=False, analyse=False):
         """
@@ -79,6 +81,8 @@ class TradingEnv(gym.Env):
         self.game_so.GetActions(self.ctx, self.actions, self.action_len)
         self.game_so.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
 
+        # self.target_queue.append(self.raw_obs[26])
+
         self.obs = self._get_obs(self.raw_obs)
 
         if self.analyse:
@@ -88,9 +92,22 @@ class TradingEnv(gym.Env):
         # here obs should be a numpy array float32 to make it more general (in case we want to use continuous actions)
         return self.obs
 
+    def _step(self, action_index):
+
+        # 根据买卖方向进行反方向撤单操作
+        if 1 <= action_index <= 7:
+            self.game_so.Action(self.ctx, self.actions[18])  # 如果是买动作，卖方向全撤。
+        else:
+            self.game_so.Action(self.ctx, self.actions[15])  # 如果是卖动作，买方向全撤。
+
+        self.game_so.Action(self.ctx, self.actions[action_index])
+
     def step(self, action_index):
+        last_target = self.raw_obs[26]
+        last_actual_target = self.raw_obs[27]
+
         if action_index < self.n_actions:
-            self.game_so.Action(self.ctx, self.actions[action_index])
+            self._step(action_index)
         else:
             raise ValueError("Received invalid action={} which is not part of the action space".format(action_index))
 
@@ -106,11 +123,22 @@ class TradingEnv(gym.Env):
         score = self.rewards[0]
         profit = self.rewards[1]
 
-        target_bias = abs(self.raw_obs[26] - self.raw_obs[27])
+        # 长度为【10】的队列，存放target_diff.将队列中的target_diff的总和就是当前总容忍度
+        # TODO 需要考虑target变化的方向
+        # last_bias = last_target-last_actual_target
+        # now_bias = self.raw_obs[26]-self.raw_obs[27]
+        # if last_bias < now_bias and now_bias*last_bias > 0:
+        #     self.target_diff.append(abs(self.raw_obs[26]-last_target))
+        # target_tolerance = sum(self.target_diff)
+        #
+        target_bias = abs(self.raw_obs[26]-self.raw_obs[27])
+
+        # target_bias = 0 if target_bias < target_tolerance else target_bias-target_tolerance
+
         # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
         designed_reward = -target_bias
         # Optionally we can pass additional info, we are not using that for now
-        info = {"TradingDay": self.raw_obs[25], "profit": profit}
+        info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score}
 
         if self.analyse:
             self._append_one_step_data(action=action_index, designed_reward=designed_reward)
@@ -132,7 +160,9 @@ class TradingEnv(gym.Env):
         bid_ask_volume_filter = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 29, 31, 33, 35, 37, 39]
         total_volume_filter = [22]
         target_filter = [26, 27]
-        obs = np.array(raw_obs[:40], dtype=np.float32)
+        obs = np.array(raw_obs[:44], dtype=np.float32)
+
+        obs = np.delete(obs, [34, 35, 42, 43])
 
         obs[price_filter] = (obs[price_filter] - price_mean) / (price_max - price_mean)
         obs[bid_ask_volume_filter] = (obs[bid_ask_volume_filter] - bid_ask_volume_mean) / (
@@ -140,11 +170,6 @@ class TradingEnv(gym.Env):
         obs[total_volume_filter] = (obs[total_volume_filter] - total_volume_mean) / (
                 total_volume_max - total_volume_mean)
         obs[target_filter] = (obs[target_filter] - target_mean) / (target_max - target_mean)
-
-        # obs[price_filter] = (obs[price_filter] - price_mean) / price_max
-        # obs[bid_ask_volume_filter] = (obs[bid_ask_volume_filter] - bid_ask_volume_mean) / bid_ask_volume_max
-        # obs[total_volume_filter] = (obs[total_volume_filter] - total_volume_mean) / total_volume_max
-        # obs[target_filter] = (obs[target_filter] - target_mean) / target_max
 
         obs = np.delete(obs, [0, 25])
         obs[obs < -1] = -1
@@ -154,14 +179,16 @@ class TradingEnv(gym.Env):
 
     def _append_one_step_data(self, action=None, designed_reward=None):
         info_dict = {}
+        raw_obs = np.array(self.raw_obs[:44], dtype=np.float32)
+        raw_obs = np.delete(raw_obs, [34, 35, 42, 43])
         for i in range(40):
-            info_dict[info_names[i]] = self.raw_obs[i]
+            info_dict[info_names[i]] = raw_obs[i]
 
         obs_names = info_names.copy()
         del obs_names[25]
         del obs_names[0]
         for i in range(38):
-            info_dict[obs_names[i]+"_n"] = self.obs[i]
+            info_dict[obs_names[i] + "_n"] = self.obs[i]
         for i in range(3):
             info_dict[info_names[i + 40]] = self.rewards[i]
         info_dict[info_names[43]] = action
@@ -171,12 +198,14 @@ class TradingEnv(gym.Env):
     def rendering(self, action=None):
         print("-----------------------")
         print("Action:", action)
-        print("AliveAskPrice3:", self.raw_obs[38])
-        print("AliveAskVolume3:", self.raw_obs[39])
-        print("AliveAskPrice2:", self.raw_obs[36])
-        print("AliveAskVolume2:", self.raw_obs[37])
-        print("AliveAskPrice1:", self.raw_obs[34])
-        print("AliveAskVolume1:", self.raw_obs[35])
+        print("AliveAskPriceNUM:", self.raw_obs[42])
+        print("AliveAskVolumeNUM:", self.raw_obs[43])
+        print("AliveAskPrice3:", self.raw_obs[40])
+        print("AliveAskVolume3:", self.raw_obs[41])
+        print("AliveAskPrice2:", self.raw_obs[38])
+        print("AliveAskVolume2:", self.raw_obs[39])
+        print("AliveAskPrice1:", self.raw_obs[36])
+        print("AliveAskVolume1:", self.raw_obs[37])
         print("AskPrice1:", self.raw_obs[4])
         print("AskVolume1:", self.raw_obs[5])
         print(".....")
@@ -191,6 +220,8 @@ class TradingEnv(gym.Env):
         print("AliveBidVolume2:", self.raw_obs[31])
         print("AliveBidPrice3:", self.raw_obs[32])
         print("AliveBidVolume3:", self.raw_obs[33])
+        print("AliveBidPriceNUM:", self.raw_obs[34])
+        print("AliveBidVolumeNUM:", self.raw_obs[35])
         print("-----------------------")
 
     def close(self):
@@ -208,18 +239,18 @@ if __name__ == "__main__":
         while True:
             cnt += 1
             # obs = env.reset(render=True, analyse=True)
-            obs = env.reset(analyse=True)
-
+            obs = env.reset()
+            print(env.raw_obs[26], env.raw_obs[27])
             step = 1
             while True:
-                action = env.action_space.sample()
-
+                # action = env.action_space.sample()
+                action = 0
                 obs, reward, done, info = env.step(action)
                 step += 1
-
-                if done or step == 100:
+                print(env.raw_obs[26], env.raw_obs[27], reward)
+                if done or step == 1000:
                     print("Done!", cnt)
-                    all_data = env.all_data
-                    all_data_df = pd.DataFrame(all_data)
-                    print(all_data_df.tail())
+                    # all_data = env.all_data
+                    # all_data_df = pd.DataFrame(all_data)
+                    # print(all_data_df.tail())
                     break
