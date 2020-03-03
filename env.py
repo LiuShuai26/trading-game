@@ -104,7 +104,6 @@ class TradingEnv(gym.Env):
 
     def step(self, action_index):
         last_target = self.raw_obs[26]
-        last_actual_target = self.raw_obs[27]
 
         if action_index < self.n_actions:
             self._step(action_index)
@@ -125,18 +124,15 @@ class TradingEnv(gym.Env):
 
         # 长度为【10】的队列，存放target_diff.将队列中的target_diff的总和就是当前总容忍度
         # TODO 需要考虑target变化的方向
-        # last_bias = last_target-last_actual_target
-        # now_bias = self.raw_obs[26]-self.raw_obs[27]
-        # if last_bias < now_bias and now_bias*last_bias > 0:
-        #     self.target_diff.append(abs(self.raw_obs[26]-last_target))
-        # target_tolerance = sum(self.target_diff)
-        #
+        self.target_diff.append(abs(self.raw_obs[26]-last_target))
+        target_tolerance = sum(self.target_diff)
+
         target_bias = abs(self.raw_obs[26]-self.raw_obs[27])
 
-        # target_bias = 0 if target_bias < target_tolerance else target_bias-target_tolerance
+        target_bias = 0 if target_bias < target_tolerance else target_bias-target_tolerance
 
         # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
-        designed_reward = -target_bias
+        designed_reward = -target_bias-score/50
         # Optionally we can pass additional info, we are not using that for now
         info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score}
 
