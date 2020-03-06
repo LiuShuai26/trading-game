@@ -147,8 +147,8 @@ class TradingEnv(gym.Env):
     def _get_obs(self, raw_obs):
         price_mean = 26871.05
         price_max = 28540.0
-        bid_ask_volume_mean = 8.77
-        bid_ask_volume_max = 620.0
+        bid_ask_volume_log_mean = 2.05
+        bid_ask_volume_log_max = 6.43
         total_volume_mean = 56871.13
         total_volume_max = 175383.0
         target_mean = 20.69
@@ -162,8 +162,8 @@ class TradingEnv(gym.Env):
         obs = np.delete(obs, [34, 35, 42, 43])
 
         obs[price_filter] = (obs[price_filter] - price_mean) / (price_max - price_mean)
-        obs[bid_ask_volume_filter] = (obs[bid_ask_volume_filter] - bid_ask_volume_mean) / (
-                bid_ask_volume_max - bid_ask_volume_mean)
+        obs[bid_ask_volume_filter] = (np.log(obs[bid_ask_volume_filter]) - bid_ask_volume_log_mean) / (
+                bid_ask_volume_log_max - bid_ask_volume_log_mean)
         obs[total_volume_filter] = (obs[total_volume_filter] - total_volume_mean) / (
                 total_volume_max - total_volume_mean)
         obs[target_filter] = (obs[target_filter] - target_mean) / (target_max - target_mean)
