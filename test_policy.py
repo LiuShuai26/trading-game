@@ -13,7 +13,11 @@ deterministic = False
 num_episodes = 100
 max_ep_len = 1000
 
-fpath = "/home/shuai/trading-game/spinningup/data/ppo-target-256-lowlr/ppo-target-256-lowlr_s0"
+# exp_name = "ppo-delayed_target-m343-newaction"
+exp_name = "ppo-delayed_target_10-score_divide_100-m343-newaction1"
+
+
+fpath = "/home/shuai/trading-game/spinningup/data/" + exp_name + "/" + exp_name + "_s1"
 
 fname = osp.join(fpath, 'tf1_save')
 print('\n\nLoading from %s.\n\n ' % fname)
@@ -42,6 +46,7 @@ o, r, d, ep_ret, ep_len, n = env.reset(start_day=1, skip_step=10000, analyse=Tru
 while n < num_episodes:
 
     a = get_action(o)
+    # a = 0
     o, r, d, _ = env.step(a)
     ep_ret += r
     ep_len += 1
@@ -53,7 +58,7 @@ while n < num_episodes:
         all_data = env.all_data
         all_data_df = pd.DataFrame(all_data)
         print(all_data_df.tail())
-        all_data_df.to_csv("/home/shuai/day1-test-target.csv", index=False)
+        all_data_df.to_csv("/home/shuai/day1-test-score.csv", index=False)
         print("data save!")
         break
 

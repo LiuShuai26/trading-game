@@ -17,7 +17,7 @@ info_names = [
     "HighestPrice", "LowestPrice", "TradingDay", "Target_Num", "Actual_Num", "AliveBidPrice1",
     "AliveBidVolume1", "AliveBidPrice2", "AliveBidVolume2", "AliveBidPrice3", "AliveBidVolume3",
     "AliveAskPrice1", "AliveAskVolume1", "AliveAskPrice2", "AliveAskVolume2", "AliveAskPrice3",
-    "AliveAskVolume3", "score", "profit", "total_profit", "action", "designed_reward"
+    "AliveAskVolume3", "score", "profit", "total_profit", "baseline_profit", "action", "designed_reward"
 ]
 
 data_len = [
@@ -121,18 +121,19 @@ class TradingEnv(gym.Env):
 
         score = self.rewards[0]
         profit = self.rewards[1]
+        baseline_profit = self.rewards[3]
 
-        # 长度为【10】的队列，存放target_diff.将队列中的target_diff的总和就是当前总容忍度
         # TODO 需要考虑target变化的方向
+        # self.target_diff是长度为【10】的队列，存放target每次的差值。队列中的target_diff的总和就是当前总容忍度
         self.target_diff.append(abs(self.raw_obs[26]-last_target))
         target_tolerance = sum(self.target_diff)
 
         target_bias = abs(self.raw_obs[26]-self.raw_obs[27])
 
         target_bias = 0 if target_bias < target_tolerance else target_bias-target_tolerance
-
+        action_penalization = 0 if action_index == 0 else -0.005
         # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
-        designed_reward = -target_bias-score/50
+        designed_reward = -target_bias + action_penalization
         # Optionally we can pass additional info, we are not using that for now
         info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score}
 
@@ -185,10 +186,10 @@ class TradingEnv(gym.Env):
         del obs_names[0]
         for i in range(38):
             info_dict[obs_names[i] + "_n"] = self.obs[i]
-        for i in range(3):
+        for i in range(4):
             info_dict[info_names[i + 40]] = self.rewards[i]
-        info_dict[info_names[43]] = action
-        info_dict[info_names[44]] = designed_reward
+        info_dict[info_names[44]] = action
+        info_dict[info_names[45]] = designed_reward
         self.all_data.append(info_dict)
 
     def rendering(self, action=None):
