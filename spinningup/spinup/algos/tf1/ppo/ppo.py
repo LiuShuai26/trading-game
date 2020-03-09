@@ -309,7 +309,8 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=8)
-    parser.add_argument('--epochs', type=int, default=25)
+    parser.add_argument('--steps', type=int, default=16000)
+    parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--exp_name', type=str, default='ppo-trading')
     args = parser.parse_args()
 
@@ -322,14 +323,13 @@ if __name__ == '__main__':
     sys.path.append("/home/shuai/trading-game")
     from env import TradingEnv
 
-    batch_size = 2000
-
-    steps = args.cpu * batch_size
+    # batch_size = 2000
+    # steps = args.cpu * batch_size
 
     pi_lr = 3e-05
     vf_lr = 1e-4
 
     ppo(lambda: TradingEnv(), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[300, 400, 300]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
-        seed=args.seed, steps_per_epoch=steps, epochs=args.epochs,
+        seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs,
         logger_kwargs=logger_kwargs)
