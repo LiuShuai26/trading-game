@@ -247,15 +247,19 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+    ep_target_bias, ep_apnum, ep_score = 0, 0, 0
 
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
         for t in range(local_steps_per_epoch):
             a, v_t, logp_t = sess.run(get_action_ops, feed_dict={x_ph: o.reshape(1, -1)})
 
-            o2, r, d, _ = env.step(a[0])
+            o2, r, d, info = env.step(a[0])
             ep_ret += r
             ep_len += 1
+            ep_target_bias += info["target_bias"]
+            ep_apnum += info["ap_num"]
+            ep_score += info["score"]
 
             # save and log
             buf.store(o, a, r, v_t, logp_t)
@@ -273,8 +277,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 buf.finish_path(last_val)
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
-                    logger.store(EpRet=ep_ret, EpLen=ep_len)
+                    logger.store(EpRet=ep_ret, EpTarget_bias=ep_target_bias, EpApNum=ep_apnum, EpScore=ep_score, EpLen=ep_len)
                 o, ep_ret, ep_len = env.reset(), 0, 0
+                ep_target_bias, ep_apnum, ep_score = 0, 0, 0
 
         # Save model
         if (epoch % save_freq == 0) or (epoch == epochs - 1):
@@ -286,6 +291,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         # Log info about epoch
         logger.log_tabular('Epoch', epoch)
         logger.log_tabular('EpRet', with_min_and_max=True)
+        logger.log_tabular('EpTarget_bias', with_min_and_max=True)
+        logger.log_tabular('EpApNum', with_min_and_max=True)
+        logger.log_tabular('EpScore', with_min_and_max=True)
         logger.log_tabular('EpLen', average_only=True)
         logger.log_tabular('VVals', with_min_and_max=True)
         logger.log_tabular('TotalEnvInteracts', (epoch + 1) * steps_per_epoch)
@@ -308,8 +316,8 @@ if __name__ == '__main__':
     parser.add_argument('--env', type=str, default='Trading')
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--cpu', type=int, default=8)
-    parser.add_argument('--steps', type=int, default=24000)
+    parser.add_argument('--cpu', type=int, default=12)
+    parser.add_argument('--steps', type=int, default=36000)
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--exp_name', type=str, default='ppo-trading')
     args = parser.parse_args()
@@ -325,11 +333,11 @@ if __name__ == '__main__':
 
     # batch_size = 2000
     # steps = args.cpu * batch_size
-
+    max_ep_len = 3000
     pi_lr = 3e-05
     vf_lr = 1e-4
 
     ppo(lambda: TradingEnv(), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[300, 400, 300]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
-        seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs,
+        seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=max_ep_len,
         logger_kwargs=logger_kwargs)
