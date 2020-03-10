@@ -52,12 +52,12 @@ class TradingEnv(gym.Env):
         self.n_actions = 15
         self.action_space = spaces.Discrete(self.n_actions)
         self.observation_space = spaces.Box(low=-1, high=1, shape=(38,), dtype=np.float32)
-        self.max_ep_len = 1000
+        self.max_ep_len = 3000
         self.render = False
         self.analyse = False
         self.all_data = []
         self.obs = None
-        self.target_diff = deque(maxlen=10)
+        self.target_diff = deque(maxlen=30)
 
     def reset(self, start_day=None, skip_step=None, render=False, analyse=False):
         """
