@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import json
 import ctypes
+import matplotlib.pyplot as plt
 
 os.chdir("/home/shuai/trading-game/rl_game/game")
 soFile = "./game.so"
@@ -66,7 +67,7 @@ count = [
 
 all_data = []
 
-for start_day in range(1, 2):
+for start_day in range(1, 12):
 
     arr_len = 100
     arr1 = ctypes.c_int * arr_len
@@ -83,12 +84,24 @@ for start_day in range(1, 2):
     ctx = expso.CreateContext(json.dumps(start_info).encode())
     # print(start_info)
 
+    score = []
+    epscore = 0
+    last_score = 0
+
     step = 1
     while True:
 
         expso.GetInfo(ctx, infos, infos_len)
         expso.GetReward(ctx, rewards, rewards_len)
-        print(infos[34], infos[35], infos[42], infos[43])
+
+        epscore += rewards[0]
+
+        score.append(rewards[0]-last_score)
+
+        last_score = rewards[0]
+
+        # print(infos[26])
+        # print(rewards[0], rewards[3])
         # print(infos[1], infos[23])
 
         # info_dict = {}
@@ -99,7 +112,9 @@ for start_day in range(1, 2):
         # all_data.append(info_dict)
 
         done = infos[0]
-        if done == 1 or step == 1000:
+        if done == 1 or step == 3000:
+            plt.plot(score)
+            plt.show()
             print("step:", step)
             expso.ReleaseContext(ctx)
             break

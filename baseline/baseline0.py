@@ -10,33 +10,42 @@ env = env.TradingEnv()
 targets = []
 acts = []
 
-for i in range(20):
+for i in range(100):
     obs = env.reset()
     step = 1
     score = []
     epret = 0
+    epscore = 0
+    last_score = 0
     while True:
         # action = env.action_space.sample()
 
         if obs[24] > obs[25]:
-            action = 5
+            action = 6
         elif obs[24] < obs[25]:
-            action = 10
+            action = 9
         else:
+            action = 0
+
+        if step < 1000:
             action = 0
         # action = 0
         obs, reward, done, info = env.step(action)
         step += 1
         epret += reward
+        epscore += abs(info['score']-last_score)
         # if step > 400:
         #     score.append(info['score'])
-        # score.append(env.rewards[3])
+        if step > 1000:
+            score.append(abs(info['score']-last_score))
+        last_score = info['score']
 
         # if done:
-        if done or step == 1000:
-            # plt.plot(score)
-            # plt.show()
-            print(epret)
+        if done or step == 4000:
+            plt.plot(score)
+            plt.show()
+            print(epscore)
+            # print(epret)
             # all_data = env.all_data
             # all_data_df = pd.DataFrame(all_data)
             # print(all_data_df.tail())

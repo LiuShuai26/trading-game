@@ -73,7 +73,7 @@ class TradingEnv(gym.Env):
             start_day = np.random.randint(1, 63, 1)[0]
         if skip_step is None:
             data_len_index = start_day - 1
-            skip_step = int(np.random.randint(0, data_len[data_len_index] - self.max_ep_len, 1)[0])
+            skip_step = int(np.random.randint(0, data_len[data_len_index] - self.max_ep_len+1010, 1)[0])
         start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": skip_step}
         if self.ctx:
             self.close()
@@ -137,7 +137,7 @@ class TradingEnv(gym.Env):
         # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
         designed_reward = -(target_bias + action_penalization + score/1000)
         # Optionally we can pass additional info, we are not using that for now
-        info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score, "target_bias": target_bias,
+        info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score/1000, "target_bias": target_bias,
                 "ap_num": action_penalization/0.005}
 
         if self.analyse:

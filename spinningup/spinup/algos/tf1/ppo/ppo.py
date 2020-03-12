@@ -85,8 +85,8 @@ class PPOBuffer:
 
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
-        target_kl=0.01, logger_kwargs=dict(), save_freq=10):
+        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=4000,
+        target_kl=0.01, logger_kwargs=dict(), save_freq=100):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -192,7 +192,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     # Experience buffer
     local_steps_per_epoch = int(steps_per_epoch / num_procs())
-    buf = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch, gamma, lam)
+    buf = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch - 1000, gamma, lam)
 
     # Count variables
     var_counts = tuple(core.count_vars(scope) for scope in ['pi', 'v'])
@@ -262,7 +262,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             ep_score += info["score"]
 
             # save and log
-            buf.store(o, a, r, v_t, logp_t)
+            if ep_len > 1000:
+                buf.store(o, a, r, v_t, logp_t)
             logger.store(VVals=v_t)
 
             # Update obs (critical!)
@@ -277,7 +278,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 buf.finish_path(last_val)
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
-                    logger.store(EpRet=ep_ret, EpTarget_bias=ep_target_bias, EpApNum=ep_apnum, EpScore=ep_score, EpLen=ep_len)
+                    logger.store(EpRet=ep_ret, EpTarget_bias=ep_target_bias, EpApNum=ep_apnum, EpScore=ep_score,
+                                 EpLen=ep_len)
                 o, ep_ret, ep_len = env.reset(), 0, 0
                 ep_target_bias, ep_apnum, ep_score = 0, 0, 0
 
@@ -317,7 +319,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=12)
-    parser.add_argument('--steps', type=int, default=36000)
+    parser.add_argument('--steps', type=int, default=48000)
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--exp_name', type=str, default='ppo-trading')
     args = parser.parse_args()
