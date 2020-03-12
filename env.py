@@ -73,7 +73,7 @@ class TradingEnv(gym.Env):
             start_day = np.random.randint(1, 63, 1)[0]
         if skip_step is None:
             data_len_index = start_day - 1
-            skip_step = int(np.random.randint(0, data_len[data_len_index] - self.max_ep_len+1010, 1)[0])
+            skip_step = int(np.random.randint(0, data_len[data_len_index] - (self.max_ep_len+1010), 1)[0])
         start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": skip_step}
         if self.ctx:
             self.close()
