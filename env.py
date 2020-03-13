@@ -49,17 +49,18 @@ class TradingEnv(gym.Env):
         self.rewards = arr1()
         self.rewards_len = arr()
 
+        self.num_stack = num_stack
+        self.frames = deque(maxlen=num_stack)
+
         self.n_actions = 15
         self.action_space = spaces.Discrete(self.n_actions)
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(38,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(38*num_stack,), dtype=np.float32)
         self.max_ep_len = 3000
         self.render = False
         self.analyse = False
         self.all_data = []
         self.obs = None
         self.target_diff = deque(maxlen=30)
-        self.num_stack = num_stack
-        self.frames = deque(maxlen=num_stack)
 
     def _framestack(self, observation):
         if not self.frames:
