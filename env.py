@@ -54,7 +54,8 @@ class TradingEnv(gym.Env):
 
         self.n_actions = 15
         self.action_space = spaces.Discrete(self.n_actions)
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(38*num_stack,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(num_stack, 38,), dtype=np.float32)
+
         self.max_ep_len = 3000
         self.render = False
         self.analyse = False
