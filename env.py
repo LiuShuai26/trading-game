@@ -54,8 +54,7 @@ class TradingEnv(gym.Env):
 
         self.n_actions = 15
         self.action_space = spaces.Discrete(self.n_actions)
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(num_stack, 38,), dtype=np.float32)
-
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(38*num_stack,), dtype=np.float32)
         self.max_ep_len = 3000
         self.render = False
         self.analyse = False
@@ -68,7 +67,7 @@ class TradingEnv(gym.Env):
             [self.frames.append(observation) for _ in range(self.num_stack)]
         else:
             self.frames.append(observation)
-        return np.stack(self.frames, axis=0)
+        return np.concatenate(self.frames, axis=0)
 
     def reset(self, start_day=None, skip_step=None, render=False, analyse=False):
         """
