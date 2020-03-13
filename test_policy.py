@@ -20,11 +20,11 @@ data_len = [
 ]
 
 deterministic = False
-num_episodes = 1000
+num_episodes = 1
 max_ep_len = 3000
 
 # exp_name = "ppo-delayed_target-m343-newaction"
-exp_name = "ppo-m343-b36000-l3000-dt_30-c12-score_d1000"
+exp_name = "ppo-m343-b36000-l3000-dt_30-c12-set3"
 
 
 fpath = "/home/shuai/trading-game/spinningup/data/" + exp_name + "/" + exp_name + "_s0"
@@ -51,9 +51,9 @@ get_action = lambda x: sess.run(action_op, feed_dict={model['x']: x[None, :]})[0
 
 def baseline069(obs):
     if obs[24] > obs[25]:
-        action = 6
+        action = 7
     elif obs[24] < obs[25]:
-        action = 9
+        action = 8
     else:
         action = 0
     return action
@@ -70,7 +70,7 @@ env = TradingEnv()
 logger = EpochLogger()
 
 for start, skip in zip(start_day, skip_step):
-    o, r, d, ep_ret, ep_len, n = env.reset(start_day=start, skip_step=skip, analyse=False), 0, False, 0, 0, 0
+    o, r, d, ep_ret, ep_len, n = env.reset(start_day=start, skip_step=skip, analyse=True), 0, False, 0, 0, 0
     # o, r, d, ep_ret, ep_len, n = env.reset(), 0, False, 0, 0, 0
 
     ep_target_bias, ep_apnum, ep_score = 0, 0, 0
@@ -89,12 +89,14 @@ for start, skip in zip(start_day, skip_step):
             logger.store(EpRet=ep_ret, EpTarget_bias=ep_target_bias, EpApNum=ep_apnum, EpScore=ep_score, EpLen=ep_len)
             # print('Episode %d \t EpRet %.3f \t EpLen %d' % (n, ep_ret, ep_len))
             n += 1
-            # all_data = env.all_data
-            # all_data_df = pd.DataFrame(all_data)
-            # print(all_data_df.tail())
-            # all_data_df.to_csv("/home/shuai/day1-test-069.csv", index=True)
-            # print("data save!")
+            all_data = env.all_data
+            all_data_df = pd.DataFrame(all_data)
+            print(all_data_df.tail())
+            all_data_df.to_csv("/home/shuai/day1-test-set3.csv", index=True)
+            print("data save!")
+            # exit()
             break
+
 
 logger.log_tabular('EpRet', with_min_and_max=True)
 logger.log_tabular('EpTarget_bias', with_min_and_max=True)
@@ -107,7 +109,7 @@ logger.dump_tabular()
 logger = EpochLogger()
 
 for start, skip in zip(start_day, skip_step):
-    o, r, d, ep_ret, ep_len, n = env.reset(start_day=start, skip_step=skip, analyse=False), 0, False, 0, 0, 0
+    o, r, d, ep_ret, ep_len, n = env.reset(start_day=start, skip_step=skip, analyse=True), 0, False, 0, 0, 0
     # o, r, d, ep_ret, ep_len, n = env.reset(), 0, False, 0, 0, 0
 
     ep_target_bias, ep_apnum, ep_score = 0, 0, 0
@@ -126,11 +128,11 @@ for start, skip in zip(start_day, skip_step):
             logger.store(EpRet=ep_ret, EpTarget_bias=ep_target_bias, EpApNum=ep_apnum, EpScore=ep_score, EpLen=ep_len)
             # print('Episode %d \t EpRet %.3f \t EpLen %d' % (n, ep_ret, ep_len))
             n += 1
-            # all_data = env.all_data
-            # all_data_df = pd.DataFrame(all_data)
-            # print(all_data_df.tail())
-            # all_data_df.to_csv("/home/shuai/day1-test-069.csv", index=True)
-            # print("data save!")
+            all_data = env.all_data
+            all_data_df = pd.DataFrame(all_data)
+            print(all_data_df.tail())
+            all_data_df.to_csv("/home/shuai/day1-test-078.csv", index=True)
+            print("data save!")
             break
 
 logger.log_tabular('EpRet', with_min_and_max=True)

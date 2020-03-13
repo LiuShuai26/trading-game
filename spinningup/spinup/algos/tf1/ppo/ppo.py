@@ -285,7 +285,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
         # Save model
         if (epoch % save_freq == 0) or (epoch == epochs - 1):
-            logger.save_state({'env': env}, None)
+            logger.save_state({'env': env}, epoch)
 
         # Perform PPO update!
         update()
@@ -335,11 +335,12 @@ if __name__ == '__main__':
 
     # batch_size = 2000
     # steps = args.cpu * batch_size
+    num_stack = 3
     max_ep_len = 4000
     pi_lr = 3e-05
     vf_lr = 1e-4
 
-    ppo(lambda: TradingEnv(), actor_critic=core.mlp_actor_critic,
+    ppo(lambda: TradingEnv(num_stack=num_stack), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[300, 400, 300]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=max_ep_len,
         logger_kwargs=logger_kwargs)

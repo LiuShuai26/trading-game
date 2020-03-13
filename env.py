@@ -31,7 +31,7 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self):
+    def __init__(self, num_stack=1):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -58,6 +58,15 @@ class TradingEnv(gym.Env):
         self.all_data = []
         self.obs = None
         self.target_diff = deque(maxlen=30)
+        self.num_stack = num_stack
+        self.frames = deque(maxlen=num_stack)
+
+    def _framestack(self, observation):
+        if not self.frames:
+            [self.frames.append(observation) for _ in range(self.num_stack)]
+        else:
+            self.frames.append(observation)
+        return np.stack(self.frames, axis=0)
 
     def reset(self, start_day=None, skip_step=None, render=False, analyse=False):
         """
@@ -89,7 +98,8 @@ class TradingEnv(gym.Env):
             self._append_one_step_data()
         if self.render:
             self.rendering()
-        # here obs should be a numpy array float32 to make it more general (in case we want to use continuous actions)
+        if self.num_stack > 1:
+            self.obs = self._framestack(self.obs)
         return self.obs
 
     def _step(self, action_index):
@@ -117,6 +127,8 @@ class TradingEnv(gym.Env):
         self.game_so.GetReward(self.ctx, self.rewards, self.rewards_len)
 
         self.obs = self._get_obs(self.raw_obs)
+        if self.num_stack > 1:
+            self.obs = self._framestack(self.obs)
 
         done = bool(self.raw_obs[0])
 
@@ -137,7 +149,7 @@ class TradingEnv(gym.Env):
         # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
         designed_reward = -(target_bias + action_penalization + score/1000)
         # Optionally we can pass additional info, we are not using that for now
-        info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score/1000, "target_bias": target_bias,
+        info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score, "target_bias": target_bias,
                 "ap_num": action_penalization/0.005}
 
         if self.analyse:
