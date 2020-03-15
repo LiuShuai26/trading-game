@@ -24,12 +24,12 @@ num_episodes = 1
 max_ep_len = 3000
 
 # exp_name = "ppo-delayed_target-m343-newaction"
-exp_name = "ppo-m343-b36000-l3000-dt_30-c12-set3"
+exp_name = "ppo-m343-b36000-l3000-dt_30-c12-set4"
 
 
 fpath = "/home/shuai/trading-game/spinningup/data/" + exp_name + "/" + exp_name + "_s0"
 
-fname = osp.join(fpath, 'tf1_save')
+fname = osp.join(fpath, 'tf1_save7600')
 print('\n\nLoading from %s.\n\n ' % fname)
 
 # load the things!
@@ -92,7 +92,7 @@ for start, skip in zip(start_day, skip_step):
             all_data = env.all_data
             all_data_df = pd.DataFrame(all_data)
             print(all_data_df.tail())
-            all_data_df.to_csv("/home/shuai/day1-test-set3.csv", index=True)
+            all_data_df.to_csv("/home/shuai/day1-test-set4.csv", index=True)
             print("data save!")
             # exit()
             break

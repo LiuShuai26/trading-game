@@ -116,6 +116,7 @@ class TradingEnv(gym.Env):
     def step(self, action_index):
         last_target = self.raw_obs[26]
         last_bias = self.raw_obs[26] - self.raw_obs[27]
+        last_score = self.rewards[0]
 
         if action_index < self.n_actions:
             self._step(action_index)
@@ -133,7 +134,7 @@ class TradingEnv(gym.Env):
 
         done = bool(self.raw_obs[0])
 
-        score = self.rewards[0]
+        score = self.rewards[0] - last_score
         profit = self.rewards[1]
         baseline_profit = self.rewards[3]
 
@@ -148,7 +149,7 @@ class TradingEnv(gym.Env):
         target_bias = 0 if target_bias < target_tolerance else target_bias - target_tolerance
         action_penalization = 0 if action_index == 0 else 0.005
         # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
-        designed_reward = -(target_bias + action_penalization + score/1000)
+        designed_reward = -(target_bias + action_penalization + score/100)
         # Optionally we can pass additional info, we are not using that for now
         info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score, "target_bias": target_bias,
                 "ap_num": action_penalization/0.005}

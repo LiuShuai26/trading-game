@@ -10,15 +10,16 @@ env = env.TradingEnv(num_stack=3)
 # env = gym.make('CartPole-v0')
 # env = FrameStack(env, 3)
 
-print(env.observation_space)
-
-targets = []
-acts = []
+obs_dim = env.observation_space.shape
+act_dim = env.action_space.shape
+print(obs_dim)
+print(act_dim)
+print(env.observation_space, env.action_space)
 
 for i in range(1):
     obs = env.reset()
     print(obs)
-    print(np.array(obs).reshape(1, -1))
+    print(np.array(obs).reshape(1, -1).shape)
 
     step = 1
     while True:
