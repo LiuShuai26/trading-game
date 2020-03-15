@@ -335,7 +335,7 @@ if __name__ == '__main__':
 
     # batch_size = 2000
     # steps = args.cpu * batch_size
-    num_stack = 3
+    num_stack = 1
     max_ep_len = 4000
     pi_lr = 3e-05
     vf_lr = 1e-4

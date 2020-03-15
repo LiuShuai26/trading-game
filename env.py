@@ -31,7 +31,7 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, num_stack=1):
+    def __init__(self, num_stack=1, score_scale=1, ap=0.005):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -54,13 +54,15 @@ class TradingEnv(gym.Env):
 
         self.n_actions = 15
         self.action_space = spaces.Discrete(self.n_actions)
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(38*num_stack,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(38 * num_stack,), dtype=np.float32)
         self.max_ep_len = 3000
         self.render = False
         self.analyse = False
         self.all_data = []
         self.obs = None
         self.target_diff = deque(maxlen=30)
+        self.score_scale = score_scale
+        self.ap = ap
 
     def _framestack(self, observation):
         if not self.frames:
@@ -83,7 +85,7 @@ class TradingEnv(gym.Env):
             start_day = np.random.randint(1, 63, 1)[0]
         if skip_step is None:
             data_len_index = start_day - 1
-            skip_step = int(np.random.randint(0, data_len[data_len_index] - (self.max_ep_len+1010), 1)[0])
+            skip_step = int(np.random.randint(0, data_len[data_len_index] - (self.max_ep_len + 1010), 1)[0])
         start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": skip_step}
         if self.ctx:
             self.close()
@@ -134,7 +136,7 @@ class TradingEnv(gym.Env):
 
         done = bool(self.raw_obs[0])
 
-        score = self.rewards[0] - last_score
+        score = (self.rewards[0] - last_score) * self.score_scale
         profit = self.rewards[1]
         baseline_profit = self.rewards[3]
 
@@ -147,12 +149,13 @@ class TradingEnv(gym.Env):
         target_tolerance = sum(self.target_diff)
         target_bias = abs(target_bias)
         target_bias = 0 if target_bias < target_tolerance else target_bias - target_tolerance
-        action_penalization = 0 if action_index == 0 else 0.005
+        action_penalization = 0 if action_index == 0 else self.ap
         # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
-        designed_reward = -(target_bias + action_penalization + score/100)
+        designed_reward = -(target_bias + action_penalization + score)
         # Optionally we can pass additional info, we are not using that for now
-        info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score, "target_bias": target_bias,
-                "ap_num": action_penalization/0.005}
+        info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score/self.score_scale,
+                "target_bias": target_bias,
+                "ap_num": action_penalization/self.ap}
 
         if self.analyse:
             self._append_one_step_data(action=action_index, designed_reward=designed_reward)

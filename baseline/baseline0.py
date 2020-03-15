@@ -16,7 +16,7 @@ for i in range(10):
     score = []
     epret = 0
     epscore = 0
-    last_score = 0
+    eptarget_bias = 0
     while True:
         # action = env.action_space.sample()
 
@@ -27,24 +27,26 @@ for i in range(10):
         else:
             action = 0
 
-        if step < 1000:
-            action = 0
+        # if step < 1000:
+        #     action = 0
         # action = 0
         obs, reward, done, info = env.step(action)
         step += 1
         epret += reward
-        epscore += (info['score']-last_score)/100
+
+        # print("target_bias:", info['target_bias'], "score:", info['score'])
+        eptarget_bias += info['target_bias']
+        epscore += info['score']
         # if step > 400:
         #     score.append(info['score'])
         if step > 1000:
-            score.append((info['score']-last_score)/100)
-        last_score = info['score']
+            score.append(info['score'])
 
         # if done:
         if done or step == 4000:
             # plt.plot(score)
             # plt.show()
-            print(epscore)
+            print(eptarget_bias, epscore)
             # print(epret)
             # all_data = env.all_data
             # all_data_df = pd.DataFrame(all_data)
