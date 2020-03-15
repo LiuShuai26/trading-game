@@ -336,11 +336,13 @@ if __name__ == '__main__':
     # batch_size = 2000
     # steps = args.cpu * batch_size
     num_stack = 1
+    score_scale = 1
+    ap = 0.005
     max_ep_len = 4000
     pi_lr = 3e-05
     vf_lr = 1e-4
 
-    ppo(lambda: TradingEnv(num_stack=num_stack), actor_critic=core.mlp_actor_critic,
+    ppo(lambda: TradingEnv(num_stack=num_stack, score_scale=score_scale, ap=ap), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[300, 400, 300]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=max_ep_len,
         logger_kwargs=logger_kwargs)
