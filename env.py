@@ -92,6 +92,7 @@ class TradingEnv(gym.Env):
         self.ctx = self.game_so.CreateContext(json.dumps(start_info).encode())
         self.game_so.GetActions(self.ctx, self.actions, self.action_len)
         self.game_so.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
+        self.game_so.GetReward(self.ctx, self.rewards, self.rewards_len)
 
         # self.target_queue.append(self.raw_obs[26])
 
