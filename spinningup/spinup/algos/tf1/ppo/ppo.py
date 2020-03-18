@@ -7,6 +7,7 @@ from spinup.utils.logx import EpochLogger
 from spinup.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
 from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
 import sys
+import datetime
 
 
 class PPOBuffer:
@@ -86,7 +87,7 @@ class PPOBuffer:
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=4000,
-        target_kl=0.01, logger_kwargs=dict(), save_freq=1000):
+        target_kl=0.01, logger_kwargs=dict(), save_freq=1000, exp_name='exp', summary_dir="/home/shuai/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -190,6 +191,25 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # Every step, get: action, value, and logprob
     get_action_ops = [pi, v, logp_pi]
 
+    # Tensorflow Summary Ops
+    def build_summaries():
+        summaries = []
+        EpRet = tf.Variable(0.)
+        EpTarget_bias = tf.Variable(0.)
+        EpApNum = tf.Variable(0.)
+        EpScore = tf.Variable(0.)
+        summaries.append(tf.summary.scalar("Reward", EpRet))
+        summaries.append(tf.summary.scalar("EpTarget_bias", EpTarget_bias))
+        summaries.append(tf.summary.scalar("EpApNum", EpApNum))
+        summaries.append(tf.summary.scalar("EpScore", EpScore))
+        test_ops = tf.summary.merge(summaries)
+        test_vars = [EpRet, EpTarget_bias, EpApNum, EpScore]
+
+        return test_ops, test_vars
+
+    # Set up summary Ops
+    test_ops, test_vars = build_summaries()
+
     # Experience buffer
     local_steps_per_epoch = int(steps_per_epoch / num_procs())
     buf = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch - 1000, gamma, lam)
@@ -220,6 +240,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # Sync params across processes
     sess.run(sync_all_params())
 
+    if proc_id() == 0:
+        writer = tf.summary.FileWriter(
+            summary_dir + "/" + str(datetime.datetime.now()) + "-" + exp_name, sess.graph)
     # Setup model saving
     logger.setup_tf_saver(sess, inputs={'x': x_ph}, outputs={'pi': pi, 'v': v})
 
@@ -280,6 +303,16 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     # only save EpRet / EpLen if trajectory finished
                     logger.store(EpRet=ep_ret, EpTarget_bias=ep_target_bias, EpApNum=ep_apnum, EpScore=ep_score,
                                  EpLen=ep_len)
+
+                    if proc_id() == 0:
+                        summary_str = sess.run(test_ops, feed_dict={
+                            test_vars[0]: ep_ret,
+                            test_vars[1]: ep_target_bias,
+                            test_vars[2]: ep_apnum,
+                            test_vars[3]: ep_score
+                        })
+                        writer.add_summary(summary_str, (epoch + 1) * steps_per_epoch)
+                        writer.flush()
                 o, ep_ret, ep_len = env.reset(), 0, 0
                 ep_target_bias, ep_apnum, ep_score = 0, 0, 0
 
@@ -320,7 +353,12 @@ if __name__ == '__main__':
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=12)
     parser.add_argument('--steps', type=int, default=48000)
-    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--epochs', type=int, default=20000)
+    parser.add_argument('--num_stack', type=int, default=1)
+    parser.add_argument('--score_scale', type=float, default=1)
+    parser.add_argument('--ap', type=float, default=0.005)
+    parser.add_argument('--dataset_size', type=int, default=62)
+
     parser.add_argument('--exp_name', type=str, default='ppo-trading')
     args = parser.parse_args()
 
@@ -335,14 +373,15 @@ if __name__ == '__main__':
 
     # batch_size = 2000
     # steps = args.cpu * batch_size
-    num_stack = 1
-    score_scale = 1
-    ap = 0.005
     max_ep_len = 4000
     pi_lr = 3e-05
     vf_lr = 1e-4
 
-    ppo(lambda: TradingEnv(num_stack=num_stack, score_scale=score_scale, ap=ap), actor_critic=core.mlp_actor_critic,
+    exp_name = args.exp_name + "fs=" + str(args.num_stack) + "ss=" + str(args.score_scale) + "ap=" + str(args.ap)
+
+    ppo(lambda: TradingEnv(dataset_size=args.dataset_size, num_stack=args.num_stack, score_scale=args.score_scale,
+                           ap=args.ap),
+        actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[300, 400, 300]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=max_ep_len,
-        logger_kwargs=logger_kwargs)
+        logger_kwargs=logger_kwargs, exp_name=exp_name)

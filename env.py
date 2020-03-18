@@ -31,7 +31,7 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, num_stack=1, score_scale=1, ap=0.005):
+    def __init__(self, dataset_size=62, num_stack=1, score_scale=1, ap=0.005):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -52,6 +52,7 @@ class TradingEnv(gym.Env):
         self.num_stack = num_stack
         self.frames = deque(maxlen=num_stack)
 
+        self.dataset_size = dataset_size
         self.n_actions = 15
         self.action_space = spaces.Discrete(self.n_actions)
         self.observation_space = spaces.Box(low=-1, high=1, shape=(38 * num_stack,), dtype=np.float32)
@@ -82,7 +83,7 @@ class TradingEnv(gym.Env):
         self.analyse = analyse
         self.all_data = []
         if not start_day:
-            start_day = np.random.randint(1, 63, 1)[0]
+            start_day = np.random.randint(1, self.dataset_size+1, 1)[0]
         if skip_step is None:
             data_len_index = start_day - 1
             skip_step = int(np.random.randint(0, data_len[data_len_index] - (self.max_ep_len + 1010), 1)[0])
