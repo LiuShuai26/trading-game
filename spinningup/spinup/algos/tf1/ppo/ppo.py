@@ -358,15 +358,16 @@ if __name__ == '__main__':
     parser.add_argument('--score_scale', type=float, default=1)
     parser.add_argument('--ap', type=float, default=0.005)
     parser.add_argument('--dataset_size', type=int, default=62)
-
     parser.add_argument('--exp_name', type=str, default='ppo-trading')
     args = parser.parse_args()
+
+    exp_name = args.exp_name + "-fs=" + str(args.num_stack) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
 
     mpi_fork(args.cpu)  # run parallel code with mpi
 
     from spinup.utils.run_utils import setup_logger_kwargs
 
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
+    logger_kwargs = setup_logger_kwargs(exp_name, args.seed)
 
     sys.path.append("/home/shuai/trading-game")
     from env import TradingEnv
@@ -376,8 +377,6 @@ if __name__ == '__main__':
     max_ep_len = 4000
     pi_lr = 3e-05
     vf_lr = 1e-4
-
-    exp_name = args.exp_name + "fs=" + str(args.num_stack) + "ss=" + str(args.score_scale) + "ap=" + str(args.ap)
 
     ppo(lambda: TradingEnv(dataset_size=args.dataset_size, num_stack=args.num_stack, score_scale=args.score_scale,
                            ap=args.ap),

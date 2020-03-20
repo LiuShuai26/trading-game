@@ -142,15 +142,15 @@ class TradingEnv(gym.Env):
         profit = self.rewards[1]
         baseline_profit = self.rewards[3]
 
-        # TODO 需要考虑target变化的方向
-        # self.target_diff是长度为【10】的队列，存放target每次的差值。队列中的target_diff的总和就是当前总容忍度
         target_bias = self.raw_obs[26] - self.raw_obs[27]
+        # self.target_diff是长度为【10】的队列，存放target每次的差值。队列中的target_diff的总和就是当前总容忍度
         # 与上一步的target差值相比，同号且绝对值变小，代表target向实际target靠近，此target变化不应给惩罚延迟
-        if not (last_bias * target_bias >= 0 and last_bias > target_bias):
+        if not (last_bias * target_bias >= 0 and abs(last_bias) > abs(target_bias)):
             self.target_diff.append(abs(self.raw_obs[26] - last_target))
         target_tolerance = sum(self.target_diff)
         target_bias = abs(target_bias)
         target_bias = 0 if target_bias < target_tolerance else target_bias - target_tolerance
+
         action_penalization = 0 if action_index == 0 else self.ap
         # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
         designed_reward = -(target_bias + action_penalization + score)
