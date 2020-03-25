@@ -195,15 +195,19 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     def build_summaries():
         summaries = []
         EpRet = tf.Variable(0.)
-        EpTarget_bias = tf.Variable(0.)
+        EpRet_target_bias = tf.Variable(0.)
+        EpRet_score = tf.Variable(0.)
         EpApNum = tf.Variable(0.)
+        EpTarget_bias = tf.Variable(0.)
         EpScore = tf.Variable(0.)
         summaries.append(tf.summary.scalar("Reward", EpRet))
-        summaries.append(tf.summary.scalar("EpTarget_bias", EpTarget_bias))
+        summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
+        summaries.append(tf.summary.scalar("EpRet_score", EpRet_score))
         summaries.append(tf.summary.scalar("EpApNum", EpApNum))
+        summaries.append(tf.summary.scalar("EpTarget_bias", EpTarget_bias))
         summaries.append(tf.summary.scalar("EpScore", EpScore))
         test_ops = tf.summary.merge(summaries)
-        test_vars = [EpRet, EpTarget_bias, EpApNum, EpScore]
+        test_vars = [EpRet, EpRet_target_bias, EpRet_score, EpApNum, EpTarget_bias, EpScore]
 
         return test_ops, test_vars
 
@@ -304,19 +308,21 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
                     logger.store(EpRet=ep_ret,
-                                 EpTarget_bias=ep_target_bias,
                                  EpRet_target_bias=ep_reward_target_bias,
-                                 EpScore=ep_score,
                                  EpRet_score=ep_reward_score,
                                  EpApNum=ep_apnum,
+                                 EpTarget_bias=ep_target_bias,
+                                 EpScore=ep_score,
                                  EpLen=ep_len)
 
                     if proc_id() == 0:
                         summary_str = sess.run(test_ops, feed_dict={
                             test_vars[0]: ep_ret,
-                            test_vars[1]: ep_target_bias,
-                            test_vars[2]: ep_apnum,
-                            test_vars[3]: ep_score
+                            test_vars[1]: ep_reward_target_bias,
+                            test_vars[2]: ep_reward_score,
+                            test_vars[3]: ep_apnum,
+                            test_vars[4]: ep_target_bias,
+                            test_vars[5]: ep_score,
                         })
                         writer.add_summary(summary_str, (epoch + 1) * steps_per_epoch)
                         writer.flush()
@@ -332,12 +338,12 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
         # Log info about epoch
         logger.log_tabular('Epoch', epoch)
-        logger.log_tabular('EpRet', with_min_and_max=True)
-        logger.log_tabular('EpTarget_bias', with_min_and_max=True)
+        logger.log_tabular('EpRet', average_only=True)
         logger.log_tabular('EpRet_target_bias', average_only=True)
-        logger.log_tabular('EpScore', with_min_and_max=True)
         logger.log_tabular('EpRet_score', average_only=True)
         logger.log_tabular('EpApNum', average_only=True)
+        logger.log_tabular('EpTarget_bias', with_min_and_max=True)
+        logger.log_tabular('EpScore', with_min_and_max=True)
         logger.log_tabular('EpLen', average_only=True)
         logger.log_tabular('VVals', with_min_and_max=True)
         logger.log_tabular('TotalEnvInteracts', (epoch + 1) * steps_per_epoch)

@@ -61,7 +61,7 @@ class TradingEnv(gym.Env):
         self.analyse = False
         self.all_data = []
         self.obs = None
-        self.target_diff = deque(maxlen=10)
+        self.target_diff = deque(maxlen=30)
         self.score_scale = score_scale
         self.ap = ap
 
@@ -156,7 +156,7 @@ class TradingEnv(gym.Env):
         reward_target_bias = abs(target_bias)
 
         # target delay
-        # reward_target_bias = 0 if reward_target_bias < target_tolerance else reward_target_bias - target_tolerance
+        reward_target_bias = 0 if reward_target_bias < target_tolerance else reward_target_bias - target_tolerance
 
         # target clip
         target_clip = round(target_now * 0.1)
@@ -164,8 +164,8 @@ class TradingEnv(gym.Env):
 
         action_penalization = 0 if action_index == 0 else self.ap
 
-        designed_reward = -(reward_target_bias + action_penalization)
-        # designed_reward = -(target_bias + action_penalization + reward_score)
+        # designed_reward = -(reward_target_bias + action_penalization)
+        designed_reward = -(reward_target_bias + action_penalization + reward_score)
         # Optionally we can pass additional info, we are not using that for now
         info = {"TradingDay": self.raw_obs[25], "profit": profit,
                 "score": one_step_score,
