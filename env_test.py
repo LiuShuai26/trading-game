@@ -6,30 +6,29 @@ import gym
 from gym.wrappers.frame_stack import FrameStack
 
 
-env = env.TradingEnv(num_stack=3)
+env = env.TradingEnv(dataset_size=1, num_stack=3)
 # env = gym.make('CartPole-v0')
 # env = FrameStack(env, 3)
 
-obs_dim = env.observation_space.shape
-act_dim = env.action_space.shape
-print(obs_dim)
-print(act_dim)
-print(env.observation_space, env.action_space)
+# obs_dim = env.observation_space.shape
+# act_dim = env.action_space.shape
+# print(obs_dim)
+# print(act_dim)
+# print(env.observation_space, env.action_space)
 
 for i in range(1):
     obs = env.reset()
     print(obs)
-    print(np.array(obs).reshape(1, -1).shape)
-
     step = 1
     while True:
         action = env.action_space.sample()
         # action = 0
         obs, reward, done, info = env.step(action)
-        print(np.array(obs))
+        print(info)
+        # print(env.ap)
         step += 1
 
         # if done:
-        if done or step == 10:
+        if done or step == 1000:
             print("DONE")
             break

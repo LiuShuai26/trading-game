@@ -61,7 +61,7 @@ class TradingEnv(gym.Env):
         self.analyse = False
         self.all_data = []
         self.obs = None
-        self.target_diff = deque(maxlen=30)
+        self.target_diff = deque(maxlen=10)
         self.score_scale = score_scale
         self.ap = ap
 
@@ -137,26 +137,41 @@ class TradingEnv(gym.Env):
             self.obs = self._framestack(self.obs)
 
         done = bool(self.raw_obs[0])
+        one_step_score = self.rewards[0] - last_score
 
-        score = (self.rewards[0] - last_score) * self.score_scale
+        reward_score = one_step_score * self.score_scale
         profit = self.rewards[1]
-        baseline_profit = self.rewards[3]
 
-        target_bias = self.raw_obs[26] - self.raw_obs[27]
+        target_now = self.raw_obs[26]
+        actual_target = self.raw_obs[27]
+
+        target_bias = target_now - actual_target
+
         # self.target_diff是长度为【10】的队列，存放target每次的差值。队列中的target_diff的总和就是当前总容忍度
         # 与上一步的target差值相比，同号且绝对值变小，代表target向实际target靠近，此target变化不应给惩罚延迟
         if not (last_bias * target_bias >= 0 and abs(last_bias) > abs(target_bias)):
-            self.target_diff.append(abs(self.raw_obs[26] - last_target))
+            self.target_diff.append(abs(target_now - last_target))
         target_tolerance = sum(self.target_diff)
-        target_bias = abs(target_bias)
-        target_bias = 0 if target_bias < target_tolerance else target_bias - target_tolerance
+
+        reward_target_bias = abs(target_bias)
+
+        # target delay
+        # reward_target_bias = 0 if reward_target_bias < target_tolerance else reward_target_bias - target_tolerance
+
+        # target clip
+        target_clip = round(target_now * 0.1)
+        # reward_target_bias = 0 if reward_target_bias < target_clip else reward_target_bias - target_clip
 
         action_penalization = 0 if action_index == 0 else self.ap
-        # designed_reward = -score - target_bias  # score smaller better, target_bias smaller better.
-        designed_reward = -(target_bias + action_penalization + score)
+
+        designed_reward = -(reward_target_bias + action_penalization)
+        # designed_reward = -(target_bias + action_penalization + reward_score)
         # Optionally we can pass additional info, we are not using that for now
-        info = {"TradingDay": self.raw_obs[25], "profit": profit, "score": score/self.score_scale,
-                "target_bias": target_bias,
+        info = {"TradingDay": self.raw_obs[25], "profit": profit,
+                "score": one_step_score,
+                "reward_score": reward_score,
+                "target_bias": abs(target_bias),
+                "reward_target_bias": reward_target_bias,
                 "ap_num": action_penalization/self.ap}
 
         if self.analyse:

@@ -270,7 +270,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
-    ep_target_bias, ep_apnum, ep_score = 0, 0, 0
+    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
@@ -281,8 +281,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             ep_ret += r
             ep_len += 1
             ep_target_bias += info["target_bias"]
-            ep_apnum += info["ap_num"]
+            ep_reward_target_bias += info["reward_target_bias"]
             ep_score += info["score"]
+            ep_reward_score += info["reward_score"]
+            ep_apnum += info["ap_num"]
 
             # save and log
             if ep_len > 1000:
@@ -301,7 +303,12 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 buf.finish_path(last_val)
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
-                    logger.store(EpRet=ep_ret, EpTarget_bias=ep_target_bias, EpApNum=ep_apnum, EpScore=ep_score,
+                    logger.store(EpRet=ep_ret,
+                                 EpTarget_bias=ep_target_bias,
+                                 EpRet_target_bias=ep_reward_target_bias,
+                                 EpScore=ep_score,
+                                 EpRet_score=ep_reward_score,
+                                 EpApNum=ep_apnum,
                                  EpLen=ep_len)
 
                     if proc_id() == 0:
@@ -314,7 +321,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                         writer.add_summary(summary_str, (epoch + 1) * steps_per_epoch)
                         writer.flush()
                 o, ep_ret, ep_len = env.reset(), 0, 0
-                ep_target_bias, ep_apnum, ep_score = 0, 0, 0
+                ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
         # Save model
         if (epoch % save_freq == 0) or (epoch == epochs - 1):
@@ -327,8 +334,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('Epoch', epoch)
         logger.log_tabular('EpRet', with_min_and_max=True)
         logger.log_tabular('EpTarget_bias', with_min_and_max=True)
-        logger.log_tabular('EpApNum', with_min_and_max=True)
+        logger.log_tabular('EpRet_target_bias', average_only=True)
         logger.log_tabular('EpScore', with_min_and_max=True)
+        logger.log_tabular('EpRet_score', average_only=True)
+        logger.log_tabular('EpApNum', average_only=True)
         logger.log_tabular('EpLen', average_only=True)
         logger.log_tabular('VVals', with_min_and_max=True)
         logger.log_tabular('TotalEnvInteracts', (epoch + 1) * steps_per_epoch)
@@ -341,6 +350,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('ClipFrac', average_only=True)
         logger.log_tabular('StopIter', average_only=True)
         logger.log_tabular('Time', time.time() - start_time)
+        logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch)/(time.time() - start_time))
         logger.dump_tabular()
 
 
