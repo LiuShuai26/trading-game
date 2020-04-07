@@ -16,19 +16,22 @@ env = env.TradingEnv(dataset_size=1, num_stack=3)
 # print(act_dim)
 # print(env.observation_space, env.action_space)
 
-for i in range(1):
+for i in range(10):
     obs = env.reset()
-    print(obs)
+    # print(obs)
     step = 1
     while True:
         action = env.action_space.sample()
         # action = 0
         obs, reward, done, info = env.step(action)
-        print(info)
+        print(info['one_step_score'])
+        print(info['reward_target_bias'])
+        print("---")
+        # print(info)
         # print(env.ap)
         step += 1
 
         # if done:
-        if done or step == 1000:
+        if done or step == 4000:
             print("DONE")
             break

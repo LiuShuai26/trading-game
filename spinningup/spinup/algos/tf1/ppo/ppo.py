@@ -87,7 +87,7 @@ class PPOBuffer:
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=4000,
-        target_kl=0.01, logger_kwargs=dict(), save_freq=1000, exp_name='exp', summary_dir="/home/shuai/tb"):
+        target_kl=0.01, logger_kwargs=dict(), save_freq=5e7, exp_name='exp', summary_dir="/home/shuai/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -199,15 +199,17 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         EpRet_score = tf.Variable(0.)
         EpApNum = tf.Variable(0.)
         EpTarget_bias = tf.Variable(0.)
+        Target_bias_per_step = tf.Variable(0.)
         EpScore = tf.Variable(0.)
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
         summaries.append(tf.summary.scalar("EpRet_score", EpRet_score))
         summaries.append(tf.summary.scalar("EpApNum", EpApNum))
         summaries.append(tf.summary.scalar("EpTarget_bias", EpTarget_bias))
+        summaries.append(tf.summary.scalar("Target_bias_per_step", Target_bias_per_step))
         summaries.append(tf.summary.scalar("EpScore", EpScore))
         test_ops = tf.summary.merge(summaries)
-        test_vars = [EpRet, EpRet_target_bias, EpRet_score, EpApNum, EpTarget_bias, EpScore]
+        test_vars = [EpRet, EpRet_target_bias, EpRet_score, EpApNum, EpTarget_bias, Target_bias_per_step, EpScore]
 
         return test_ops, test_vars
 
@@ -276,6 +278,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
+    min_score = 150
+    max_saved_steps = 0
+
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
         for t in range(local_steps_per_epoch):
@@ -286,7 +291,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             ep_len += 1
             ep_target_bias += info["target_bias"]
             ep_reward_target_bias += info["reward_target_bias"]
-            ep_score += info["score"]
+            ep_score += info["one_step_score"]
             ep_reward_score += info["reward_score"]
             ep_apnum += info["ap_num"]
 
@@ -307,42 +312,60 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 buf.finish_path(last_val)
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
-                    logger.store(EpRet=ep_ret,
+                    logger.store(AverageEpRet=ep_ret,
                                  EpRet_target_bias=ep_reward_target_bias,
                                  EpRet_score=ep_reward_score,
                                  EpApNum=ep_apnum,
                                  EpTarget_bias=ep_target_bias,
+                                 Target_bias_per_step=ep_target_bias / ep_len,
                                  EpScore=ep_score,
                                  EpLen=ep_len)
 
-                    if proc_id() == 0:
-                        summary_str = sess.run(test_ops, feed_dict={
-                            test_vars[0]: ep_ret,
-                            test_vars[1]: ep_reward_target_bias,
-                            test_vars[2]: ep_reward_score,
-                            test_vars[3]: ep_apnum,
-                            test_vars[4]: ep_target_bias,
-                            test_vars[5]: ep_score,
-                        })
-                        writer.add_summary(summary_str, (epoch + 1) * steps_per_epoch)
-                        writer.flush()
                 o, ep_ret, ep_len = env.reset(), 0, 0
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
+        total_steps = (epoch + 1) * steps_per_epoch
         # Save model
-        if (epoch % save_freq == 0) or (epoch == epochs - 1):
-            logger.save_state({'env': env}, epoch)
+        # save model every save_freq(50M) steps
+        if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
+            logger.save_state({'env': env}, total_steps)
+            max_saved_steps = total_steps // save_freq
+        # save model if lower than the min_score. min_score start from 150.
+        if ep_reward_score < min_score:
+            logger.save_state({'env': env}, ep_reward_score)
+            min_score = ep_reward_score
 
         # Perform PPO update!
         update()
 
+        # tensorboard writting
+        tb_ep_ret = logger.get_stats('AverageEpRet')[0]
+        tb_ret_target_bias = logger.get_stats('EpRet_target_bias')[0]
+        tb_ret_score = logger.get_stats('EpRet_score')[0]
+        tb_apnum = logger.get_stats('EpApNum')[0]
+        tb_target_bias = logger.get_stats('EpTarget_bias')[0]
+        tb_target_bias_per_step = logger.get_stats('Target_bias_per_step')[0]
+        tb_score = logger.get_stats('EpScore')[0]
+        if proc_id() == 0:
+            summary_str = sess.run(test_ops, feed_dict={
+                    test_vars[0]: tb_ep_ret,
+                    test_vars[1]: tb_ret_target_bias,
+                    test_vars[2]: tb_ret_score,
+                    test_vars[3]: tb_apnum,
+                    test_vars[4]: tb_target_bias,
+                    test_vars[5]: tb_target_bias_per_step,
+                    test_vars[6]: tb_score,
+                })
+            writer.add_summary(summary_str, (epoch + 1) * steps_per_epoch)
+            writer.flush()
         # Log info about epoch
         logger.log_tabular('Epoch', epoch)
-        logger.log_tabular('EpRet', average_only=True)
-        logger.log_tabular('EpRet_target_bias', average_only=True)
-        logger.log_tabular('EpRet_score', average_only=True)
-        logger.log_tabular('EpApNum', average_only=True)
+        logger.log_tabular('AverageEpRet', tb_ep_ret)
+        logger.log_tabular('EpRet_target_bias', tb_ret_target_bias)
+        logger.log_tabular('EpRet_score', tb_ret_score)
+        logger.log_tabular('EpApNum', tb_apnum)
         logger.log_tabular('EpTarget_bias', with_min_and_max=True)
+        logger.log_tabular('Target_bias_per_step', tb_target_bias_per_step)
         logger.log_tabular('EpScore', with_min_and_max=True)
         logger.log_tabular('EpLen', average_only=True)
         logger.log_tabular('VVals', with_min_and_max=True)
@@ -356,7 +379,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('ClipFrac', average_only=True)
         logger.log_tabular('StopIter', average_only=True)
         logger.log_tabular('Time', time.time() - start_time)
-        logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch)/(time.time() - start_time))
+        logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch) / (time.time() - start_time))
         logger.dump_tabular()
 
 
@@ -367,19 +390,21 @@ if __name__ == '__main__':
     parser.add_argument('--env', type=str, default='Trading')
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--cpu', type=int, default=12)
-    parser.add_argument('--steps', type=int, default=48000)
+    parser.add_argument('--cpu', type=int, default=24)
+    parser.add_argument('--steps', type=int, default=96000)
     parser.add_argument('--epochs', type=int, default=20000)
     parser.add_argument('--num_stack', type=int, default=1)
+    parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1)
     parser.add_argument('--ap', type=float, default=0.005)
     parser.add_argument('--dataset_size', type=int, default=62)
-    parser.add_argument('--exp_name', type=str, default='ppo-trading')
+    parser.add_argument('--exp_name', type=str, default='ppo-trading-TEST')
     args = parser.parse_args()
 
-    exp_name = args.exp_name + "-fs=" + str(args.num_stack) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
+    exp_name = args.exp_name + "-fs=" + str(args.num_stack) + "-ts=" + str(args.target_scale) + "-ss=" + str(
+        args.score_scale) + "-ap=" + str(args.ap)
 
-    mpi_fork(args.cpu)  # run parallel code with mpi
+    mpi_fork(args.cpu, bind_to_core=False)  # run parallel code with mpi
 
     from spinup.utils.run_utils import setup_logger_kwargs
 
@@ -391,12 +416,13 @@ if __name__ == '__main__':
     # batch_size = 2000
     # steps = args.cpu * batch_size
     max_ep_len = 4000
-    pi_lr = 3e-05
+    pi_lr = 4e-05
     vf_lr = 1e-4
 
-    ppo(lambda: TradingEnv(dataset_size=args.dataset_size, num_stack=args.num_stack, score_scale=args.score_scale,
+    ppo(lambda: TradingEnv(dataset_size=args.dataset_size, num_stack=args.num_stack, target_scale=args.target_scale,
+                           score_scale=args.score_scale,
                            ap=args.ap),
         actor_critic=core.mlp_actor_critic,
-        ac_kwargs=dict(hidden_sizes=[300, 400, 300]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
+        ac_kwargs=dict(hidden_sizes=[600, 800, 600]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name)

@@ -31,7 +31,8 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, dataset_size=62, num_stack=1, score_scale=1, ap=0.005):
+    def __init__(self, dataset_size=1, start_day=3, start_skip=50000, end_skip=60000, num_stack=1, target_scale=1,
+                 score_scale=1, ap=0.5):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -53,15 +54,21 @@ class TradingEnv(gym.Env):
         self.frames = deque(maxlen=num_stack)
 
         self.dataset_size = dataset_size
+        self.start_day = start_day
+        self.start_skip = start_skip
+        self.end_skip = end_skip
+
         self.n_actions = 15
         self.action_space = spaces.Discrete(self.n_actions)
         self.observation_space = spaces.Box(low=-1, high=1, shape=(38 * num_stack,), dtype=np.float32)
         self.max_ep_len = 3000
+        # self.max_ep_len = 214000
         self.render = False
         self.analyse = False
         self.all_data = []
         self.obs = None
-        self.target_diff = deque(maxlen=30)
+        self.target_diff = deque(maxlen=30)  # target delay setting
+        self.target_scale = target_scale
         self.score_scale = score_scale
         self.ap = ap
 
@@ -72,7 +79,7 @@ class TradingEnv(gym.Env):
             self.frames.append(observation)
         return np.concatenate(self.frames, axis=0)
 
-    def reset(self, start_day=None, skip_step=None, render=False, analyse=False):
+    def reset(self, start_day=None, start_skip=None, render=False, analyse=False):
         """
         Important: the observation must be a numpy array
         :return: (np.array)
@@ -82,12 +89,23 @@ class TradingEnv(gym.Env):
         self.render = render
         self.analyse = analyse
         self.all_data = []
-        if not start_day:
-            start_day = np.random.randint(1, self.dataset_size+1, 1)[0]
-        if skip_step is None:
-            data_len_index = start_day - 1
-            skip_step = int(np.random.randint(0, data_len[data_len_index] - (self.max_ep_len + 1010), 1)[0])
+
+        # test mode use all data, assign start_day and start_skip in reset method.
+        if start_day:
+            # assert start_day and start_skip, "you need use both start_day and start_skip"
+            skip_step = start_skip
+        else:
+            # use one day data and specific skip step or use dataset_size days data without specific skip step.
+            if self.dataset_size == 1:
+                start_day = self.start_day
+                skip_step = int(np.random.randint(self.start_skip, self.end_skip + 1010, 1)[0])
+            else:
+                start_day = np.random.randint(1, self.dataset_size + 1, 1)[0]
+                data_len_index = start_day - 1
+                skip_step = int(np.random.randint(0, data_len[data_len_index] - (self.max_ep_len + 1010), 1)[0])
+
         start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": skip_step}
+        # print(start_info)
         if self.ctx:
             self.close()
         self.ctx = self.game_so.CreateContext(json.dumps(start_info).encode())
@@ -158,8 +176,9 @@ class TradingEnv(gym.Env):
         # target delay
         reward_target_bias = 0 if reward_target_bias < target_tolerance else reward_target_bias - target_tolerance
 
+        reward_target_bias *= self.target_scale
         # target clip
-        target_clip = round(target_now * 0.1)
+        # target_clip = round(target_now * 0.05)
         # reward_target_bias = 0 if reward_target_bias < target_clip else reward_target_bias - target_clip
 
         action_penalization = 0 if action_index == 0 else self.ap
@@ -168,11 +187,12 @@ class TradingEnv(gym.Env):
         designed_reward = -(reward_target_bias + action_penalization + reward_score)
         # Optionally we can pass additional info, we are not using that for now
         info = {"TradingDay": self.raw_obs[25], "profit": profit,
-                "score": one_step_score,
+                "one_step_score": one_step_score,
+                "score": self.rewards[0],
                 "reward_score": reward_score,
                 "target_bias": abs(target_bias),
                 "reward_target_bias": reward_target_bias,
-                "ap_num": action_penalization/self.ap}
+                "ap_num": action_penalization / self.ap}
 
         if self.analyse:
             self._append_one_step_data(action=action_index, designed_reward=designed_reward)
@@ -228,35 +248,6 @@ class TradingEnv(gym.Env):
         info_dict[info_names[44]] = action
         info_dict[info_names[45]] = designed_reward
         self.all_data.append(info_dict)
-
-    def rendering(self, action=None):
-        print("-----------------------")
-        print("Action:", action)
-        print("AliveAskPriceNUM:", self.raw_obs[42])
-        print("AliveAskVolumeNUM:", self.raw_obs[43])
-        print("AliveAskPrice3:", self.raw_obs[40])
-        print("AliveAskVolume3:", self.raw_obs[41])
-        print("AliveAskPrice2:", self.raw_obs[38])
-        print("AliveAskVolume2:", self.raw_obs[39])
-        print("AliveAskPrice1:", self.raw_obs[36])
-        print("AliveAskVolume1:", self.raw_obs[37])
-        print("AskPrice1:", self.raw_obs[4])
-        print("AskVolume1:", self.raw_obs[5])
-        print(".....")
-        print("LastPrice:", self.raw_obs[1])
-        print("Actual_Num:", self.raw_obs[27])
-        print(".....")
-        print("BidPrice1:", self.raw_obs[2])
-        print("BidVolume1:", self.raw_obs[3])
-        print("AliveBidPrice1:", self.raw_obs[28])
-        print("AliveBidVolume1:", self.raw_obs[29])
-        print("AliveBidPrice2:", self.raw_obs[30])
-        print("AliveBidVolume2:", self.raw_obs[31])
-        print("AliveBidPrice3:", self.raw_obs[32])
-        print("AliveBidVolume3:", self.raw_obs[33])
-        print("AliveBidPriceNUM:", self.raw_obs[34])
-        print("AliveBidVolumeNUM:", self.raw_obs[35])
-        print("-----------------------")
 
     def close(self):
         self.game_so.ReleaseContext(self.ctx)
