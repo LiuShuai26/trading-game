@@ -31,7 +31,7 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, dataset_size=1, start_day=3, start_skip=50000, end_skip=60000, num_stack=1, target_scale=1,
+    def __init__(self, dataset_size=1, start_day=3, start_skip=17000, end_skip=27000, num_stack=1, target_scale=1,
                  score_scale=1, ap=0.5):
         super(TradingEnv, self).__init__()
 

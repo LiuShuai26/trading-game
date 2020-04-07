@@ -325,18 +325,6 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
         total_steps = (epoch + 1) * steps_per_epoch
-        # Save model
-        # save model every save_freq(50M) steps
-        if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
-            logger.save_state({'env': env}, total_steps)
-            max_saved_steps = total_steps // save_freq
-        # save model if lower than the min_score. min_score start from 150.
-        if ep_reward_score < min_score:
-            logger.save_state({'env': env}, ep_reward_score)
-            min_score = ep_reward_score
-
-        # Perform PPO update!
-        update()
 
         # tensorboard writting
         tb_ep_ret = logger.get_stats('AverageEpRet')[0]
@@ -348,16 +336,30 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_score = logger.get_stats('EpScore')[0]
         if proc_id() == 0:
             summary_str = sess.run(test_ops, feed_dict={
-                    test_vars[0]: tb_ep_ret,
-                    test_vars[1]: tb_ret_target_bias,
-                    test_vars[2]: tb_ret_score,
-                    test_vars[3]: tb_apnum,
-                    test_vars[4]: tb_target_bias,
-                    test_vars[5]: tb_target_bias_per_step,
-                    test_vars[6]: tb_score,
-                })
-            writer.add_summary(summary_str, (epoch + 1) * steps_per_epoch)
+                test_vars[0]: tb_ep_ret,
+                test_vars[1]: tb_ret_target_bias,
+                test_vars[2]: tb_ret_score,
+                test_vars[3]: tb_apnum,
+                test_vars[4]: tb_target_bias,
+                test_vars[5]: tb_target_bias_per_step,
+                test_vars[6]: tb_score,
+            })
+            writer.add_summary(summary_str, total_steps)
             writer.flush()
+
+        # Save model
+        # save model every save_freq(50M) steps
+        if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
+            max_saved_steps = total_steps // save_freq
+            logger.save_state({'env': env}, str(max_saved_steps))
+        # save model if lower than the min_score. min_score start from 150.
+        if tb_score < min_score:
+            logger.save_state({'env': env}, tb_score)
+            min_score = tb_score
+
+        # Perform PPO update!
+        update()
+
         # Log info about epoch
         logger.log_tabular('Epoch', epoch)
         logger.log_tabular('AverageEpRet', tb_ep_ret)
@@ -396,9 +398,9 @@ if __name__ == '__main__':
     parser.add_argument('--num_stack', type=int, default=1)
     parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1)
-    parser.add_argument('--ap', type=float, default=0.005)
-    parser.add_argument('--dataset_size', type=int, default=62)
-    parser.add_argument('--exp_name', type=str, default='ppo-trading-TEST')
+    parser.add_argument('--ap', type=float, default=0.5)
+    parser.add_argument('--dataset_size', type=int, default=1)
+    parser.add_argument('--exp_name', type=str, default='ppo-trading-day3-TEST')
     args = parser.parse_args()
 
     exp_name = args.exp_name + "-fs=" + str(args.num_stack) + "-ts=" + str(args.target_scale) + "-ss=" + str(
@@ -419,7 +421,8 @@ if __name__ == '__main__':
     pi_lr = 4e-05
     vf_lr = 1e-4
 
-    ppo(lambda: TradingEnv(dataset_size=args.dataset_size, num_stack=args.num_stack, target_scale=args.target_scale,
+    ppo(lambda: TradingEnv(dataset_size=args.dataset_size, start_day=3, start_skip=17000, end_skip=27000,
+                           num_stack=args.num_stack, target_scale=args.target_scale,
                            score_scale=args.score_scale,
                            ap=args.ap),
         actor_critic=core.mlp_actor_critic,
