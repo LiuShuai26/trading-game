@@ -240,7 +240,13 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     train_pi = MpiAdamOptimizer(learning_rate=pi_lr).minimize(pi_loss)
     train_v = MpiAdamOptimizer(learning_rate=vf_lr).minimize(v_loss)
 
-    sess = tf.Session()
+    config = tf.ConfigProto()
+    config.gpu_options.per_process_gpu_memory_fraction = 0.01
+    config.inter_op_parallelism_threads = 1
+    config.intra_op_parallelism_threads = 1
+    sess = tf.Session(config=config)
+    # sess = tf.Session()
+
     sess.run(tf.global_variables_initializer())
 
     # Sync params across processes
@@ -400,13 +406,13 @@ if __name__ == '__main__':
     parser.add_argument('--score_scale', type=float, default=1)
     parser.add_argument('--ap', type=float, default=0.5)
     parser.add_argument('--dataset_size', type=int, default=1)
-    parser.add_argument('--exp_name', type=str, default='ppo-trading-day3-TEST')
+    parser.add_argument('--exp_name', type=str, default='ppo-trading-day28')
     args = parser.parse_args()
 
     exp_name = args.exp_name + "-fs=" + str(args.num_stack) + "-ts=" + str(args.target_scale) + "-ss=" + str(
         args.score_scale) + "-ap=" + str(args.ap)
 
-    mpi_fork(args.cpu, bind_to_core=False)  # run parallel code with mpi
+    mpi_fork(args.cpu, bind_to_core=False, cpu_set="0-48")  # run parallel code with mpi
 
     from spinup.utils.run_utils import setup_logger_kwargs
 
@@ -421,7 +427,7 @@ if __name__ == '__main__':
     pi_lr = 4e-05
     vf_lr = 1e-4
 
-    ppo(lambda: TradingEnv(dataset_size=args.dataset_size, start_day=3, start_skip=17000, end_skip=27000,
+    ppo(lambda: TradingEnv(dataset_size=args.dataset_size, start_day=28, start_skip=17000, end_skip=27000,
                            num_stack=args.num_stack, target_scale=args.target_scale,
                            score_scale=args.score_scale,
                            ap=args.ap),
