@@ -29,10 +29,10 @@ if num_episodes == 1:
 
 test_all = True
 
-exp_name = "ppo-baseset-c24-m686-fs=1-ts=1-ss=1.0-ap=0.5"
+exp_name = "ppo-trading-dayall-clip3-ds=True-fs=1-ts=1-ss=1-ap=0.5dl=30clip=3-pilr=5e-05-vlr=1e-05"
 # exp_name = "ppo-baseset-c12-ap0.5-fs=1-ss=1.0-ap=0.5"
 fpath = "/home/shuai/trading-game/spinningup/data/" + exp_name + "/" + exp_name + "_s0"
-fname = osp.join(fpath, 'tf1_save200064000')
+fname = osp.join(fpath, 'tf1_save1')
 # 6000: 137
 # 5000: 133
 # 4000: 133

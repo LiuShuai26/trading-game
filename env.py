@@ -29,10 +29,20 @@ data_len = [
 ]
 
 
+def baseline069(raw_obs):
+    if raw_obs[26] > raw_obs[27]:
+        action = 6
+    elif raw_obs[26] < raw_obs[27]:
+        action = 9
+    else:
+        action = 0
+    return action
+
+
 class TradingEnv(gym.Env):
 
     def __init__(self, dataset_size=1, start_day=3, start_skip=17000, end_skip=27000, num_stack=1, target_scale=1,
-                 score_scale=1, ap=0.5):
+                 score_scale=1, ap=0.5, delay_len=30, target_clip=3, env_skip=False):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -67,10 +77,12 @@ class TradingEnv(gym.Env):
         self.analyse = False
         self.all_data = []
         self.obs = None
-        self.target_diff = deque(maxlen=30)  # target delay setting
+        self.target_diff = deque(maxlen=delay_len)  # target delay setting
         self.target_scale = target_scale
         self.score_scale = score_scale
         self.ap = ap
+        self.target_clip = target_clip
+        self.env_skip = env_skip
 
     def _framestack(self, observation):
         if not self.frames:
@@ -113,17 +125,25 @@ class TradingEnv(gym.Env):
         self.game_so.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.game_so.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        # self.target_queue.append(self.raw_obs[26])
+        if self.env_skip:
+            self._env_skip()
+            print("env skip 1000 len with 069 action!")
 
         self.obs = self._get_obs(self.raw_obs)
 
         if self.analyse:
             self._append_one_step_data()
-        if self.render:
-            self.rendering()
         if self.num_stack > 1:
             self.obs = self._framestack(self.obs)
+
         return self.obs
+
+    def _env_skip(self):
+        for _ in range(1000):
+            action_index = baseline069(self.raw_obs)
+            self.game_so.Action(self.ctx, self.actions[action_index])
+            self.game_so.Step(self.ctx)
+            self.game_so.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
 
     def _step(self, action_index):
 
@@ -179,7 +199,8 @@ class TradingEnv(gym.Env):
         reward_target_bias *= self.target_scale
         # target clip
         # target_clip = round(target_now * 0.05)
-        # reward_target_bias = 0 if reward_target_bias < target_clip else reward_target_bias - target_clip
+
+        reward_target_bias = 0 if reward_target_bias < self.target_clip else reward_target_bias - self.target_clip
 
         action_penalization = 0 if action_index == 0 else self.ap
 

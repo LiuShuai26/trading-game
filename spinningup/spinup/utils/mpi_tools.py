@@ -3,7 +3,7 @@ import os, subprocess, sys
 import numpy as np
 
 
-def mpi_fork(n, bind_to_core=False, cpu_set="0-23"):
+def mpi_fork(n, bind_to_core=False, cpu_set=""):
     """
     Re-launches the current script with workers linked by MPI.
 
