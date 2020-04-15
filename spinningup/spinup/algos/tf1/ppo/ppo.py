@@ -359,10 +359,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         # save model every save_freq(50M) steps
         if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
             max_saved_steps = total_steps // save_freq
-            logger.save_state({'env': env}, type='step', itr=max_saved_steps)
+            logger.save_state({'env': env}, step=total_steps, score=tb_score)
         # save model if lower than the min_score. min_score start from 150.
         if tb_score < min_score:
-            logger.save_state({'env': env}, type='score', itr=tb_score)
+            logger.save_state({'env': env}, step=total_steps, score=tb_score)
             min_score = tb_score
 
         # Perform PPO update!
@@ -408,12 +408,11 @@ if __name__ == '__main__':
     parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1)
     parser.add_argument('--ap', type=float, default=0.5)
-    parser.add_argument('--dataset_size', type=int, default=62)
     parser.add_argument('--exp_name', type=str, default='ppo-trading')
     args = parser.parse_args()
 
-    # start_day = 28
-    # start_skip = 17000
+    # start_day = 32
+    # start_skip = 20000
     # duration = 10000
     start_day = None
     start_skip = None
@@ -424,13 +423,13 @@ if __name__ == '__main__':
     delay_len = 30
     target_clip = 3
     max_ep_len = 3000
-    pi_lr = 5e-05
-    vf_lr = 1e-5
+    pi_lr = 4e-05
+    vf_lr = 1e-4
 
-    exp_name = args.exp_name + "dataset=" + str(start_day) + "-ds=" + str(data_skip) + "-fs=" + str(
-        args.num_stack) + "-ts=" + str(
-        args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap) + "dl=" + str(
-        delay_len) + "clip=" + str(target_clip) + "-pilr=" + str(pi_lr) + "-vlr=" + str(vf_lr)
+    exp_name = args.exp_name + "dataset=" + str(start_day) + '-skip' + str(start_skip)
+    exp_name += "-ds=" + str(data_skip) + "-fs=" + str(args.num_stack)
+    exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
+    exp_name += "dl=" + str(delay_len) + "clip=" + str(target_clip) + "-pilr=" + str(pi_lr) + "-vlr=" + str(vf_lr)
 
     # 0-15 16-31 32-47
 
@@ -444,7 +443,6 @@ if __name__ == '__main__':
     sys.path.append("/home/shuai/trading-game")
     from trading_env import TradingEnv, FrameStack, EnvWrapper
 
-    # env = env.TradingEnv(dataset_size=1, num_stack=3)
     env = TradingEnv(action_scheme_id=15)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack)

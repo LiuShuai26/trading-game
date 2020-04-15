@@ -159,7 +159,7 @@ class Logger:
             with open(osp.join(self.output_dir, "config.json"), 'w') as out:
                 out.write(output)
 
-    def save_state(self, state_dict, type="step", itr=None):
+    def save_state(self, state_dict, step=None, score=None):
         """
         Saves the state of an experiment.
 
@@ -182,10 +182,7 @@ class Logger:
         """
         if proc_id()==0:
             # fname = 'vars.pkl' if itr is None else 'vars%d.pkl'%itr
-            if type == 'step':
-                fname = 'vars_step%dM.pkl'%itr
-            else:
-                fname = 'vars_min_score-%d.pkl'%itr
+            fname = 'vars_step-%dM_score-%d.pkl'%(step, score)
 
             try:
                 joblib.dump(state_dict, osp.join(self.output_dir, fname))
