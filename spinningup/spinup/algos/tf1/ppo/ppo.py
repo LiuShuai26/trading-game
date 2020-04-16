@@ -202,6 +202,23 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         EpTarget_bias = tf.Variable(0.)
         Target_bias_per_step = tf.Variable(0.)
         EpScore = tf.Variable(0.)
+
+        Action0 = tf.Variable(0.)
+        Action1 = tf.Variable(0.)
+        Action2 = tf.Variable(0.)
+        Action3 = tf.Variable(0.)
+        Action4 = tf.Variable(0.)
+        Action5 = tf.Variable(0.)
+        Action6 = tf.Variable(0.)
+        Action7 = tf.Variable(0.)
+        Action8 = tf.Variable(0.)
+        Action9 = tf.Variable(0.)
+        Action10 = tf.Variable(0.)
+        Action11 = tf.Variable(0.)
+        Action12 = tf.Variable(0.)
+        Action13 = tf.Variable(0.)
+        Action14 = tf.Variable(0.)
+
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
         summaries.append(tf.summary.scalar("EpRet_score", EpRet_score))
@@ -209,9 +226,27 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("EpTarget_bias", EpTarget_bias))
         summaries.append(tf.summary.scalar("Target_bias_per_step", Target_bias_per_step))
         summaries.append(tf.summary.scalar("EpScore", EpScore))
+
+        summaries.append(tf.summary.scalar("Action0", Action0))
+        summaries.append(tf.summary.scalar("Action1", Action1))
+        summaries.append(tf.summary.scalar("Action2", Action2))
+        summaries.append(tf.summary.scalar("Action3", Action3))
+        summaries.append(tf.summary.scalar("Action4", Action4))
+        summaries.append(tf.summary.scalar("Action5", Action5))
+        summaries.append(tf.summary.scalar("Action6", Action6))
+        summaries.append(tf.summary.scalar("Action7", Action7))
+        summaries.append(tf.summary.scalar("Action8", Action8))
+        summaries.append(tf.summary.scalar("Action9", Action9))
+        summaries.append(tf.summary.scalar("Action10", Action10))
+        summaries.append(tf.summary.scalar("Action11", Action11))
+        summaries.append(tf.summary.scalar("Action12", Action12))
+        summaries.append(tf.summary.scalar("Action13", Action13))
+        summaries.append(tf.summary.scalar("Action14", Action14))
+
         test_ops = tf.summary.merge(summaries)
         test_vars = [EpRet, EpRet_target_bias, EpRet_score, EpApNum, EpTarget_bias, Target_bias_per_step, EpScore]
-
+        test_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
+                      Action10, Action11, Action12, Action13, Action14]
         return test_ops, test_vars
 
     # Set up summary Ops
@@ -328,6 +363,23 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  EpScore=ep_score,
                                  EpLen=ep_len)
 
+                    logger.store(Action0=env.act_sta[0],
+                                 Action1=env.act_sta[1],
+                                 Action2=env.act_sta[2],
+                                 Action3=env.act_sta[3],
+                                 Action4=env.act_sta[4],
+                                 Action5=env.act_sta[5],
+                                 Action6=env.act_sta[6],
+                                 Action7=env.act_sta[7],
+                                 Action8=env.act_sta[8],
+                                 Action9=env.act_sta[9],
+                                 Action10=env.act_sta[10],
+                                 Action11=env.act_sta[11],
+                                 Action12=env.act_sta[12],
+                                 Action13=env.act_sta[13],
+                                 Action14=env.act_sta[14],
+                                 )
+
                 o, ep_ret, ep_len = env.reset(start_day=start_day, start_skip=start_skip, duration=duration,
                                               burn_in=burn_in), 0, 0
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
@@ -342,6 +394,23 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_target_bias = logger.get_stats('EpTarget_bias')[0]
         tb_target_bias_per_step = logger.get_stats('Target_bias_per_step')[0]
         tb_score = logger.get_stats('EpScore')[0]
+
+        tb_action0 = logger.get_stats('Action0')[0]
+        tb_action1 = logger.get_stats('Action1')[0]
+        tb_action2 = logger.get_stats('Action2')[0]
+        tb_action3 = logger.get_stats('Action3')[0]
+        tb_action4 = logger.get_stats('Action4')[0]
+        tb_action5 = logger.get_stats('Action5')[0]
+        tb_action6 = logger.get_stats('Action6')[0]
+        tb_action7 = logger.get_stats('Action7')[0]
+        tb_action8 = logger.get_stats('Action8')[0]
+        tb_action9 = logger.get_stats('Action9')[0]
+        tb_action10 = logger.get_stats('Action10')[0]
+        tb_action11 = logger.get_stats('Action11')[0]
+        tb_action12 = logger.get_stats('Action12')[0]
+        tb_action13 = logger.get_stats('Action13')[0]
+        tb_action14 = logger.get_stats('Action14')[0]
+
         if proc_id() == 0:
             summary_str = sess.run(test_ops, feed_dict={
                 test_vars[0]: tb_ep_ret,
@@ -351,6 +420,21 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 test_vars[4]: tb_target_bias,
                 test_vars[5]: tb_target_bias_per_step,
                 test_vars[6]: tb_score,
+                test_vars[7]: tb_action0,
+                test_vars[8]: tb_action1,
+                test_vars[9]: tb_action2,
+                test_vars[10]: tb_action3,
+                test_vars[11]: tb_action4,
+                test_vars[12]: tb_action5,
+                test_vars[13]: tb_action6,
+                test_vars[14]: tb_action7,
+                test_vars[15]: tb_action8,
+                test_vars[16]: tb_action9,
+                test_vars[17]: tb_action10,
+                test_vars[18]: tb_action11,
+                test_vars[19]: tb_action12,
+                test_vars[20]: tb_action13,
+                test_vars[21]: tb_action14,
             })
             writer.add_summary(summary_str, total_steps)
             writer.flush()
@@ -431,9 +515,6 @@ if __name__ == '__main__':
     exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
     exp_name += "dl=" + str(delay_len) + "clip=" + str(target_clip) + "-pilr=" + str(pi_lr) + "-vlr=" + str(vf_lr)
 
-    # 0-15 16-31 32-47
-
-    # 0-15 16-31 now
     mpi_fork(args.cpu, bind_to_core=False, cpu_set="")  # run parallel code with mpi
 
     from spinup.utils.run_utils import setup_logger_kwargs

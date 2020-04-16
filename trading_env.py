@@ -312,6 +312,7 @@ class EnvWrapper(gym.Wrapper):
         self.ap = ap
         self.target_clip = target_clip
         self.env_skip = env_skip
+        self.act_sta = {}
 
     def baseline069(self, raw_obs):
         if raw_obs[26] > raw_obs[27]:
@@ -331,6 +332,7 @@ class EnvWrapper(gym.Wrapper):
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         obs = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
+        self.act_sta = {}
         if self.env_skip:
             self._env_skip()
         return obs
@@ -369,6 +371,11 @@ class EnvWrapper(gym.Wrapper):
 
         # designed_reward = -(reward_target_bias + action_penalization)
         designed_reward = -(reward_target_bias + action_penalization + reward_score)
+
+        if action in self.act_sta:
+            self.act_sta[action] += 1
+        else:
+            self.act_sta[action] = 1
 
         info = {"TradingDay": self.raw_obs[25], "profit": profit,
                 "one_step_score": one_step_score,
