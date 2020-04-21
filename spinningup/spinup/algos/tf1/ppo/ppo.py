@@ -218,6 +218,15 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         Action13 = tf.Variable(0.)
         Action14 = tf.Variable(0.)
 
+        VVals = tf.Variable(0.)
+        LossPi = tf.Variable(0.)
+        LossV = tf.Variable(0.)
+        DeltaLossPi = tf.Variable(0.)
+        DeltaLossV = tf.Variable(0.)
+        Entropy = tf.Variable(0.)
+        KL = tf.Variable(0.)
+        ClipFrac = tf.Variable(0.)
+
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
         summaries.append(tf.summary.scalar("EpRet_score", EpRet_score))
@@ -242,10 +251,20 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("Action13", Action13))
         summaries.append(tf.summary.scalar("Action14", Action14))
 
+        summaries.append(tf.summary.scalar("VVals", VVals))
+        summaries.append(tf.summary.scalar("LossPi", LossPi))
+        summaries.append(tf.summary.scalar("LossV", LossV))
+        summaries.append(tf.summary.scalar("DeltaLossPi", DeltaLossPi))
+        summaries.append(tf.summary.scalar("DeltaLossV", DeltaLossV))
+        summaries.append(tf.summary.scalar("Entropy", Entropy))
+        summaries.append(tf.summary.scalar("KL", KL))
+        summaries.append(tf.summary.scalar("ClipFrac", ClipFrac))
+
         test_ops = tf.summary.merge(summaries)
         test_vars = [EpRet, EpRet_target_bias, EpRet_score, EpApNum, EpTarget_bias, Target_bias_per_step, EpScore]
         test_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
                       Action10, Action11, Action12, Action13, Action14]
+        test_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac]
         return test_ops, test_vars
 
     # Set up summary Ops
@@ -408,6 +427,15 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_action13 = logger.get_stats('Action13')[0]
         tb_action14 = logger.get_stats('Action14')[0]
 
+        tb_vvals = logger.get_stats('VVals')[0]
+        tb_losspi = logger.get_stats('LossPi')[0]
+        tb_lossv = logger.get_stats('LossV')[0]
+        tb_deltalosspi = logger.get_stats('DeltaLossPi')[0]
+        tb_deltalossv = logger.get_stats('DeltaLossV')[0]
+        tb_entropy = logger.get_stats('Entropy')[0]
+        tb_kl = logger.get_stats('KL')[0]
+        tb_clipfrac = logger.get_stats('ClipFrac')[0]
+
         if proc_id() == 0:
             summary_str = sess.run(test_ops, feed_dict={
                 test_vars[0]: tb_ep_ret,
@@ -432,6 +460,14 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 test_vars[19]: tb_action12,
                 test_vars[20]: tb_action13,
                 test_vars[21]: tb_action14,
+                test_vars[22]: tb_vvals,
+                test_vars[23]: tb_losspi,
+                test_vars[24]: tb_lossv,
+                test_vars[25]: tb_deltalosspi,
+                test_vars[26]: tb_deltalossv,
+                test_vars[27]: tb_entropy,
+                test_vars[28]: tb_kl,
+                test_vars[29]: tb_clipfrac,
             })
             writer.add_summary(summary_str, total_steps)
             writer.flush()
