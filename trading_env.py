@@ -312,7 +312,7 @@ class EnvWrapper(gym.Wrapper):
         self.ap = ap
         self.target_clip = target_clip
         self.env_skip = env_skip
-        self.act_sta = {}
+        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0}
 
     def baseline069(self, raw_obs):
         if raw_obs[26] > raw_obs[27]:
@@ -328,11 +328,11 @@ class EnvWrapper(gym.Wrapper):
             action_index = self.baseline069(self.raw_obs)
             self.env.expso.Action(self.ctx, self.actions[action_index])
             self.env.expso.Step(self.ctx)
-            self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
+        self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         obs = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
-        self.act_sta = {}
+        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0}
         if self.env_skip:
             self._env_skip()
         return obs
@@ -361,10 +361,10 @@ class EnvWrapper(gym.Wrapper):
 
         reward_target_bias = abs(target_bias)
         # target delay
-        reward_target_bias = max(0, reward_target_bias-target_tolerance)
+        reward_target_bias = max(0, reward_target_bias - target_tolerance)
         # target clip
         # target_clip = round(target_now * 0.05)
-        reward_target_bias = max(0, reward_target_bias-self.target_clip)
+        reward_target_bias = max(0, reward_target_bias - self.target_clip)
         reward_target_bias *= self.target_scale
 
         action_penalization = 0 if action == 0 else self.ap

@@ -1,61 +1,31 @@
-import pandas as pd
-from env import TradingEnv
-import matplotlib.pyplot as plt
-import numpy as np
+from trading_env import TradingEnv
+from wrapper import EnvWrapper
 
 
-env = TradingEnv()
+start_day = 32
+start_skip = 0
+duration = 30000
+burn_in = 1000
+
+env = TradingEnv(action_scheme_id=15)
+env = EnvWrapper(env, delay_len=30, target_scale=1, score_scale=1, action_punish=0.5, target_clip=0,
+                 start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in, target_delay=True)
 
 
-targets = []
-acts = []
+max_len = 3000
 
-for i in range(10):
-    # env = Env.TradingEnv()
+test_times = 1000
+
+ep_score = []
+for i in range(test_times):
     obs = env.reset()
     step = 1
-    score = []
-    epret = 0
-    epscore = 0
-    eptarget_bias = 0
     while True:
-        # action = env.action_space.sample()
-        # action = 0
-
-        if obs[24] > obs[25]:
-            action = 6
-        elif obs[24] < obs[25]:
-            action = 9
-        else:
-            action = 0
-
-        # if step < 1000:
-        #     action = 0
-
+        action = env.baseline_policy(obs)
         obs, reward, done, info = env.step(action)
         step += 1
-        epret += reward
-
-        # print("target_bias:", info['target_bias'], "score:", info['score'])
-        eptarget_bias += info['target_bias']
-        epscore += info['score']
-
-        # if step > 400:
-        #     score.append(info['score'])
-        # if step > 1000:
-        #     score.append(info['score'])
-        score.append(info['score'])
-
-        # if done:
-        if done or step == 4000:
-            print(eptarget_bias, epscore)
-            print("---------------------")
-            plt.plot(score)
-            plt.show()
-            # print(epret)
-            # all_data = env.all_data
-            # all_data_df = pd.DataFrame(all_data)
-            # print(all_data_df.tail())
-            # all_data_df.to_csv("/home/shuai/day1-test-action0312.csv", index=False)
-            # print("data save!")
+        if done or step == max_len:
+            ep_score.append(info['score'])
+            print(i, "score:", info['score'], "ave score:", sum(ep_score)/(i+1))
             break
+print("test len:", max_len, "ave score:", sum(ep_score)/test_times)

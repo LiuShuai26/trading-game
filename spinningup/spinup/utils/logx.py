@@ -182,7 +182,7 @@ class Logger:
         """
         if proc_id()==0:
             # fname = 'vars.pkl' if itr is None else 'vars%d.pkl'%itr
-            fname = 'vars_step-%dM_score-%d.pkl'%(step, score)
+            fname = 'vars_step-%fM_score-%d.pkl'%(step, score)
 
             try:
                 joblib.dump(state_dict, osp.join(self.output_dir, fname))
@@ -223,7 +223,7 @@ class Logger:
         if proc_id()==0:
             assert hasattr(self, 'tf_saver_elements'), \
                 "First have to setup saving with self.setup_tf_saver"
-            fpath = 'tf1_save' + ('%d'%itr if itr is not None else '')
+            fpath = 'tf1_save' + ('%f'%itr if itr is not None else '')
             fpath = osp.join(self.output_dir, fpath)
             if osp.exists(fpath):
                 # simple_save refuses to be useful if fpath already exists,

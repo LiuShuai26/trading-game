@@ -53,4 +53,5 @@ for i in range(1):
             print("ep_score", ep_score)
             print("ep_reward_score", ep_reward_score)
             print("ep_apnum", ep_apnum)
+            print(env.act_sta[0])
             break

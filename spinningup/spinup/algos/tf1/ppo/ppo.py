@@ -87,8 +87,7 @@ class PPOBuffer:
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
-        target_kl=0.01, logger_kwargs=dict(), save_freq=5e7, exp_name='exp', summary_dir="/home/shuai/tb",
-        start_day=None, start_skip=None, duration=None, burn_in=0):
+        target_kl=0.01, logger_kwargs=dict(), save_freq=3e7, exp_name='exp', summary_dir="/home/shuai/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -317,8 +316,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                      DeltaLossV=(v_l_new - v_l_old))
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len = env.reset(start_day=start_day, start_skip=start_skip, duration=duration,
-                                        burn_in=burn_in), 0, False, 0, 0
+    o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
     min_score = 150
@@ -380,8 +378,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  Action14=env.act_sta[14],
                                  )
 
-                o, ep_ret, ep_len = env.reset(start_day=start_day, start_skip=start_skip, duration=duration,
-                                              burn_in=burn_in), 0, 0
+                o, ep_ret, ep_len = env.reset(), 0, 0
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
         total_steps = (epoch + 1) * steps_per_epoch
@@ -440,13 +437,13 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             writer.flush()
 
         # Save model
-        # save model every save_freq(50M) steps
+        # save model every save_freq(30M) steps
         if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
             max_saved_steps = total_steps // save_freq
-            logger.save_state({'env': env}, step=total_steps, score=tb_score)
+            logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
         # save model if lower than the min_score. min_score start from 150.
         if tb_score < min_score:
-            logger.save_state({'env': env}, step=total_steps, score=tb_score)
+            logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
             min_score = tb_score
 
         # Perform PPO update!
@@ -486,32 +483,31 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=8)
-    parser.add_argument('--steps', type=int, default=96000)
-    parser.add_argument('--epochs', type=int, default=200000)
+    parser.add_argument('--steps', type=int, default=72000)
+    parser.add_argument('--epochs', type=int, default=3000)
     parser.add_argument('--num_stack', type=int, default=1)
     parser.add_argument('--target_scale', type=float, default=1)
-    parser.add_argument('--score_scale', type=float, default=1)
+    parser.add_argument('--score_scale', type=float, default=1.5)
     parser.add_argument('--ap', type=float, default=0.5)
     parser.add_argument('--exp_name', type=str, default='ppo-trading')
     args = parser.parse_args()
 
     # start_day = 32
-    # start_skip = 20000
-    # duration = 10000
+    # start_skip = 0
+    # duration = 120000
     start_day = None
     start_skip = None
     duration = None
-    burn_in = 1000
-
-    data_skip = True
+    burn_in = 3000
     delay_len = 30
-    target_clip = 3
+    target_clip = 0
     max_ep_len = 3000
     pi_lr = 4e-05
     vf_lr = 1e-4
 
-    exp_name = args.exp_name + "dataset=" + str(start_day) + '-skip' + str(start_skip)
-    exp_name += "-ds=" + str(data_skip) + "-fs=" + str(args.num_stack)
+    exp_name = args.exp_name + "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(
+        duration)
+    exp_name += "-fs=" + str(args.num_stack)
     exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
     exp_name += "dl=" + str(delay_len) + "clip=" + str(target_clip) + "-pilr=" + str(pi_lr) + "-vlr=" + str(vf_lr)
 
@@ -522,16 +518,17 @@ if __name__ == '__main__':
     logger_kwargs = setup_logger_kwargs(exp_name, args.seed)
 
     sys.path.append("/home/shuai/trading-game")
-    from trading_env import TradingEnv, FrameStack, EnvWrapper
+    from trading_env import TradingEnv, FrameStack
+    from wrapper import EnvWrapper
 
     env = TradingEnv(action_scheme_id=15)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack)
 
     ppo(lambda: EnvWrapper(env, delay_len=delay_len, target_scale=args.target_scale, score_scale=args.score_scale,
-                           ap=args.ap, target_clip=target_clip, env_skip=data_skip),
+                           action_punish=args.ap, target_clip=target_clip, start_day=start_day, start_skip=start_skip,
+                           duration=duration, burn_in=burn_in, target_delay=True),
         actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[600, 800, 600]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=max_ep_len,
-        logger_kwargs=logger_kwargs, exp_name=exp_name, start_day=start_day, start_skip=start_skip, duration=duration,
-        burn_in=burn_in)
+        logger_kwargs=logger_kwargs, exp_name=exp_name)
