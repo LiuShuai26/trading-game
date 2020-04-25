@@ -182,7 +182,7 @@ class Logger:
         """
         if proc_id()==0:
             # fname = 'vars.pkl' if itr is None else 'vars%d.pkl'%itr
-            fname = 'vars_step-%fM_score-%d.pkl'%(step, score)
+            fname = 'vars_step-%.3fM_score-%d.pkl'%(step, score)
 
             try:
                 joblib.dump(state_dict, osp.join(self.output_dir, fname))
@@ -223,7 +223,7 @@ class Logger:
         if proc_id()==0:
             assert hasattr(self, 'tf_saver_elements'), \
                 "First have to setup saving with self.setup_tf_saver"
-            fpath = 'tf1_save' + ('%f'%itr if itr is not None else '')
+            fpath = 'tf1_save' + ('%.3f'%itr if itr is not None else '')
             fpath = osp.join(self.output_dir, fpath)
             if osp.exists(fpath):
                 # simple_save refuses to be useful if fpath already exists,
@@ -231,7 +231,6 @@ class Logger:
                 shutil.rmtree(fpath)
             tf.saved_model.simple_save(export_dir=fpath, **self.tf_saver_elements)
             joblib.dump(self.tf_saver_info, osp.join(fpath, 'model_info.pkl'))
-    
 
     def setup_pytorch_saver(self, what_to_save):
         """

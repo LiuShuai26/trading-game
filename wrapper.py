@@ -27,7 +27,8 @@ class EnvWrapper(gym.Wrapper):
         self.action_ratio = 0
         self.total_diff = 0
         self.timesteps = 0
-        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0}
+        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
+                        15: 0, 16: 0}
 
     def baseline069(self, raw_obs):
         if raw_obs[26] > raw_obs[27]:
@@ -49,7 +50,8 @@ class EnvWrapper(gym.Wrapper):
         self.action_ratio = 0
         self.total_diff = 0
         self.timesteps = 0
-        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0}
+        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
+                        15: 0, 16: 0}
 
         obs = self.env.reset(start_day=self.start_day,
                              start_skip=self.start_skip,
@@ -109,7 +111,7 @@ class EnvWrapper(gym.Wrapper):
                 "reward_score": reward_score,
                 "target_bias": abs(target_bias),
                 "reward_target_bias": reward_target_bias,
-                "ap_num": action_penalization / self.ap}
+                "reward_ap_num": action_penalization * self.ap}
         INFO = {}
         INFO["action_ratio"] = 1 - (self.action_ratio / 4000)
         INFO["total_diff"] = self.total_diff / 4000

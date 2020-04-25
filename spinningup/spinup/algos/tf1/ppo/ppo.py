@@ -87,7 +87,7 @@ class PPOBuffer:
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
         vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
-        target_kl=0.01, logger_kwargs=dict(), save_freq=3e7, exp_name='exp', summary_dir="/home/shuai/tb"):
+        target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, exp_name='exp', summary_dir="/home/shuai/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -217,6 +217,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         Action12 = tf.Variable(0.)
         Action13 = tf.Variable(0.)
         Action14 = tf.Variable(0.)
+        Action15 = tf.Variable(0.)
+        Action16 = tf.Variable(0.)
 
         VVals = tf.Variable(0.)
         LossPi = tf.Variable(0.)
@@ -250,6 +252,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("Action12", Action12))
         summaries.append(tf.summary.scalar("Action13", Action13))
         summaries.append(tf.summary.scalar("Action14", Action14))
+        summaries.append(tf.summary.scalar("Action15", Action15))
+        summaries.append(tf.summary.scalar("Action15", Action16))
 
         summaries.append(tf.summary.scalar("VVals", VVals))
         summaries.append(tf.summary.scalar("LossPi", LossPi))
@@ -263,7 +267,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         test_ops = tf.summary.merge(summaries)
         test_vars = [EpRet, EpRet_target_bias, EpRet_score, EpApNum, EpTarget_bias, Target_bias_per_step, EpScore]
         test_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
-                      Action10, Action11, Action12, Action13, Action14]
+                      Action10, Action11, Action12, Action13, Action14, Action15, Action16]
         test_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac]
         return test_ops, test_vars
 
@@ -295,7 +299,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     train_v = MpiAdamOptimizer(learning_rate=vf_lr).minimize(v_loss)
 
     config = tf.ConfigProto()
-    config.gpu_options.per_process_gpu_memory_fraction = 0.03
+    config.gpu_options.per_process_gpu_memory_fraction = 0.05
     config.inter_op_parallelism_threads = 1
     config.intra_op_parallelism_threads = 1
     sess = tf.Session(config=config)
@@ -395,12 +399,17 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  Action12=env.act_sta[12],
                                  Action13=env.act_sta[13],
                                  Action14=env.act_sta[14],
+                                 Action15=env.act_sta[15],
+                                 Action16=env.act_sta[16],
                                  )
 
                 o, ep_ret, ep_len = env.reset(), 0, 0
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
         total_steps = (epoch + 1) * steps_per_epoch
+
+        # Perform PPO update!
+        update()
 
         # tensorboard writting
         tb_ep_ret = logger.get_stats('AverageEpRet')[0]
@@ -426,6 +435,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_action12 = logger.get_stats('Action12')[0]
         tb_action13 = logger.get_stats('Action13')[0]
         tb_action14 = logger.get_stats('Action14')[0]
+        tb_action15 = logger.get_stats('Action15')[0]
+        tb_action16 = logger.get_stats('Action16')[0]
 
         tb_vvals = logger.get_stats('VVals')[0]
         tb_losspi = logger.get_stats('LossPi')[0]
@@ -460,30 +471,34 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 test_vars[19]: tb_action12,
                 test_vars[20]: tb_action13,
                 test_vars[21]: tb_action14,
-                test_vars[22]: tb_vvals,
-                test_vars[23]: tb_losspi,
-                test_vars[24]: tb_lossv,
-                test_vars[25]: tb_deltalosspi,
-                test_vars[26]: tb_deltalossv,
-                test_vars[27]: tb_entropy,
-                test_vars[28]: tb_kl,
-                test_vars[29]: tb_clipfrac,
+                test_vars[22]: tb_action15,
+                test_vars[23]: tb_action16,
+                test_vars[24]: tb_vvals,
+                test_vars[25]: tb_losspi,
+                test_vars[26]: tb_lossv,
+                test_vars[27]: tb_deltalosspi,
+                test_vars[28]: tb_deltalossv,
+                test_vars[29]: tb_entropy,
+                test_vars[30]: tb_kl,
+                test_vars[31]: tb_clipfrac,
             })
             writer.add_summary(summary_str, total_steps)
             writer.flush()
 
         # Save model
-        # save model every save_freq(30M) steps
-        if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
-            max_saved_steps = total_steps // save_freq
-            logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
-        # save model if lower than the min_score. min_score start from 150.
-        if tb_score < min_score:
-            logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
-            min_score = tb_score
-
-        # Perform PPO update!
-        update()
+        # save model every save_freq(25M) steps
+        if total_steps > 4e6:
+            if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
+                max_saved_steps = total_steps // save_freq
+                logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
+            # save model if lower than the min_score. min_score start from 150.
+            elif tb_score < min_score:
+                logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
+                min_score = tb_score
+            # save model if lower than the min_score. min_score start from 150.
+            elif tb_score < 50:
+                logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
+                min_score = tb_score
 
         # Log info about epoch
         logger.log_tabular('Epoch', epoch)
@@ -525,27 +540,30 @@ if __name__ == '__main__':
     parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1.5)
     parser.add_argument('--ap', type=float, default=0.5)
+    parser.add_argument('--burn_in', type=int, default=5000)
+    parser.add_argument('--delay_len', type=int, default=30)
+    parser.add_argument('--target_clip', type=int, default=3)
+    parser.add_argument('--max_ep_len', type=int, default=3000)
     parser.add_argument('--exp_name', type=str, default='ppo-trading')
     args = parser.parse_args()
 
-    # start_day = 32
-    # start_skip = 0
-    # duration = 120000
     start_day = None
     start_skip = None
     duration = None
-    burn_in = 3000
-    delay_len = 30
-    target_clip = 0
-    max_ep_len = 3000
-    pi_lr = 4e-05
-    vf_lr = 1e-4
+    # pi_lr = 4e-05
+    # vf_lr = 1e-4
+    pi_lr = 4e-5
+    vf_lr = 1e-5
 
-    exp_name = args.exp_name + "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(
-        duration)
+    action_scheme_id = 15
+
+    exp_name = args.exp_name
+    exp_name += "as" + str(action_scheme_id) + "burn_in-" + str(args.burn_in)
+    # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
     exp_name += "-fs=" + str(args.num_stack)
     exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
-    exp_name += "dl=" + str(delay_len) + "clip=" + str(target_clip) + "-pilr=" + str(pi_lr) + "-vlr=" + str(vf_lr)
+    exp_name += "dl=" + str(args.delay_len) + "clip=" + str(args.target_clip)
+    exp_name += "-pilr=" + str(pi_lr) + "-vlr=" + str(vf_lr)
 
     mpi_fork(args.cpu, bind_to_core=False, cpu_set="")  # run parallel code with mpi
 
@@ -557,14 +575,15 @@ if __name__ == '__main__':
     from trading_env import TradingEnv, FrameStack
     from wrapper import EnvWrapper
 
-    env = TradingEnv(action_scheme_id=15)
+    env = TradingEnv(action_scheme_id=action_scheme_id)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack)
 
-    ppo(lambda: EnvWrapper(env, delay_len=delay_len, target_scale=args.target_scale, score_scale=args.score_scale,
-                           action_punish=args.ap, target_clip=target_clip, start_day=start_day, start_skip=start_skip,
-                           duration=duration, burn_in=burn_in, target_delay=True),
+    ppo(lambda: EnvWrapper(env, delay_len=args.delay_len, target_scale=args.target_scale, score_scale=args.score_scale,
+                           action_punish=args.ap, target_clip=args.target_clip, start_day=start_day,
+                           start_skip=start_skip,
+                           duration=duration, burn_in=args.burn_in, target_delay=True),
         actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[600, 800, 600]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
-        seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=max_ep_len,
+        seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name)
