@@ -357,7 +357,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             ep_reward_target_bias += info["reward_target_bias"]
             ep_score += info["one_step_score"]
             ep_reward_score += info["reward_score"]
-            ep_apnum += info["ap_num"]
+            ep_apnum += info["reward_ap_num"]
 
             # save and log
             buf.store(o, a, r, v_t, logp_t)
@@ -542,18 +542,18 @@ if __name__ == '__main__':
     parser.add_argument('--ap', type=float, default=0.5)
     parser.add_argument('--burn_in', type=int, default=5000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=3)
+    parser.add_argument('--target_clip', type=int, default=0)
     parser.add_argument('--max_ep_len', type=int, default=3000)
-    parser.add_argument('--exp_name', type=str, default='ppo-trading')
+    parser.add_argument('--exp_name', type=str, default='ppo-test')
     args = parser.parse_args()
 
     start_day = None
     start_skip = None
     duration = None
-    # pi_lr = 4e-05
-    # vf_lr = 1e-4
     pi_lr = 4e-5
-    vf_lr = 1e-5
+    vf_lr = 1e-4
+    # pi_lr = 4e-5
+    # vf_lr = 1e-5
 
     action_scheme_id = 15
 

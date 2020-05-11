@@ -76,15 +76,15 @@ class TradingEnv(gym.Env):
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
 
         # random start_day if no start_day
-        if not start_day:
+        if start_day is None:
             num_days = len(data_len)
             start_day = np.random.randint(0, num_days, 1)[0] + 1
         # random start_skip if no start_skip
         day_index = start_day - 1
         max_point = data_len[day_index] - self.max_ep_len - burn_in
-        if not start_skip:
+        if start_skip is None:
             start_skip = int(np.random.randint(0, max_point, 1)[0])
-        elif duration:
+        elif duration is not None:
             assert start_skip + duration < max_point, 'start_skip or end_skip is too large!'
             start_skip = int(np.random.randint(start_skip, start_skip + duration, 1)[0])
         else:
