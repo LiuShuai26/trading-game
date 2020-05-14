@@ -59,7 +59,7 @@ class TradingEnv(gym.Env):
         self.obs_ori_dim = 38 if self.select_obs else 44
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.obs_ori_dim,), dtype=np.float32)
 
-        self.max_ep_len = 3000
+        self.max_ep_len = 0
 
         self.start_day = None
         self.start_skip = None
@@ -93,7 +93,9 @@ class TradingEnv(gym.Env):
         self.start_day = start_day
         self.start_skip = start_skip
 
-        # print('start_day:', start_day, 'start_skip:', start_skip)
+        # print("-------------env reset-------------")
+        # print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
+        #       data_len[day_index], "burn_in:", burn_in, "ml:", self.max_ep_len)
 
         start_info = {"date_index": "{} - {}".format(start_day, start_day), "skip_steps": start_skip}
 
@@ -304,7 +306,7 @@ class FrameStack(gym.Wrapper):
 
 
 class EnvWrapper(gym.Wrapper):
-    def __init__(self, env, delay_len=30, target_scale=1, score_scale=1, ap=0.5, target_clip=3, env_skip=True):
+    def __init__(self, env, delay_len=30, target_scale=1, score_scale=1, ap=0.5, target_clip=3, env_skip=False):
         super(EnvWrapper, self).__init__(env)
         self.target_diff = deque(maxlen=delay_len)  # target delay setting
         self.target_scale = target_scale
@@ -328,7 +330,7 @@ class EnvWrapper(gym.Wrapper):
             action_index = self.baseline069(self.raw_obs)
             self.env.expso.Action(self.ctx, self.actions[action_index])
             self.env.expso.Step(self.ctx)
-        self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
+            self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         obs = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)

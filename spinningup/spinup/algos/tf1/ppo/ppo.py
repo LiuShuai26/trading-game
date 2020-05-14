@@ -2,11 +2,12 @@ import numpy as np
 import tensorflow as tf
 import gym
 import time
+import sys
+sys.path.append("/home/shuai/trading-game/spinningup/")
 import spinup.algos.tf1.ppo.core as core
 from spinup.utils.logx import EpochLogger
 from spinup.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
 from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
-import sys
 import datetime
 
 
@@ -540,7 +541,7 @@ if __name__ == '__main__':
     parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1.5)
     parser.add_argument('--ap', type=float, default=0.5)
-    parser.add_argument('--burn_in', type=int, default=5000)
+    parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
     parser.add_argument('--target_clip', type=int, default=0)
     parser.add_argument('--max_ep_len', type=int, default=3000)

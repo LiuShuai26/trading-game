@@ -34,7 +34,9 @@ def mpi_fork(n, bind_to_core=False, cpu_set=""):
         else:
             args += ["-cpu-set", cpu_set]
         args += [sys.executable] + sys.argv
-        subprocess.check_call(args, env=env)
+        # subprocess.check_call(args, env=env)
+        proc = subprocess.Popen(args, env=env)
+        proc.wait()
         sys.exit()
 
 
