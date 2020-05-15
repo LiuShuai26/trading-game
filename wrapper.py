@@ -47,17 +47,19 @@ class EnvWrapper(gym.Wrapper):
             self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-    def reset(self):
+    def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         self.action_ratio = 0
         self.total_diff = 0
         self.timesteps = 0
         self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
                         15: 0, 16: 0}
-
-        obs = self.env.reset(start_day=self.start_day,
-                             start_skip=self.start_skip,
-                             duration=self.duration,
-                             burn_in=self.burn_in)
+        if start_day is not None:
+            obs = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
+        else:
+            obs = self.env.reset(start_day=self.start_day,
+                                 start_skip=self.start_skip,
+                                 duration=self.duration,
+                                 burn_in=self.burn_in)
         self._env_skip()
         return obs
 
@@ -117,5 +119,5 @@ class EnvWrapper(gym.Wrapper):
         INFO["action_ratio"] = 1 - (self.action_ratio / 4000)
         INFO["total_diff"] = self.total_diff / 4000
         INFO["diff_target"] = info["target_bias"]
-        done = done or (self.timesteps >= 4000)
+
         return obs, designed_reward, done, {**info, **INFO}

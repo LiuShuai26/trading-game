@@ -74,7 +74,8 @@ class TradingEnv(gym.Env):
         self.render = render
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
-
+        # set random seed every time
+        np.random.seed()
         # random start_day if no start_day
         if start_day is None:
             num_days = len(data_len)
@@ -303,91 +304,6 @@ class FrameStack(gym.Wrapper):
     def observation(self):
         assert len(self.frames) == self.frame_stack
         return np.stack(self.frames, axis=0).reshape((self.obs_dim,))
-
-
-class EnvWrapper(gym.Wrapper):
-    def __init__(self, env, delay_len=30, target_scale=1, score_scale=1, ap=0.5, target_clip=3, env_skip=False):
-        super(EnvWrapper, self).__init__(env)
-        self.target_diff = deque(maxlen=delay_len)  # target delay setting
-        self.target_scale = target_scale
-        self.score_scale = score_scale
-        self.ap = ap
-        self.target_clip = target_clip
-        self.env_skip = env_skip
-        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0}
-
-    def baseline069(self, raw_obs):
-        if raw_obs[26] > raw_obs[27]:
-            action = 6
-        elif raw_obs[26] < raw_obs[27]:
-            action = 9
-        else:
-            action = 0
-        return action
-
-    def _env_skip(self):
-        for _ in range(1000):
-            action_index = self.baseline069(self.raw_obs)
-            self.env.expso.Action(self.ctx, self.actions[action_index])
-            self.env.expso.Step(self.ctx)
-            self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
-
-    def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
-        obs = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
-        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0}
-        if self.env_skip:
-            self._env_skip()
-        return obs
-
-    def step(self, action):
-        last_target = self.raw_obs[26]
-        last_bias = self.raw_obs[26] - self.raw_obs[27]
-        last_score = self.rewards[0]
-
-        obs, _, done, _ = self.env.step(action)
-
-        profit = self.rewards[1]
-        one_step_score = self.rewards[0] - last_score
-        reward_score = one_step_score * self.score_scale
-
-        target_now = self.raw_obs[26]
-        actual_target = self.raw_obs[27]
-
-        target_bias = target_now - actual_target
-
-        # self.target_diff是长度为【10】的队列，存放target每次的差值。队列中的target_diff的总和就是当前总容忍度
-        # 与上一步的target差值相比，同号且绝对值变小，代表target向实际target靠近，此target变化不应给惩罚延迟
-        if not (last_bias * target_bias >= 0 and abs(last_bias) > abs(target_bias)):
-            self.target_diff.append(abs(target_now - last_target))
-        target_tolerance = sum(self.target_diff)
-
-        reward_target_bias = abs(target_bias)
-        # target delay
-        reward_target_bias = max(0, reward_target_bias - target_tolerance)
-        # target clip
-        # target_clip = round(target_now * 0.05)
-        reward_target_bias = max(0, reward_target_bias - self.target_clip)
-        reward_target_bias *= self.target_scale
-
-        action_penalization = 0 if action == 0 else self.ap
-
-        # designed_reward = -(reward_target_bias + action_penalization)
-        designed_reward = -(reward_target_bias + action_penalization + reward_score)
-
-        if action in self.act_sta:
-            self.act_sta[action] += 1
-        else:
-            self.act_sta[action] = 1
-
-        info = {"TradingDay": self.raw_obs[25], "profit": profit,
-                "one_step_score": one_step_score,
-                "score": self.rewards[0],
-                "reward_score": reward_score,
-                "target_bias": abs(target_bias),
-                "reward_target_bias": reward_target_bias,
-                "ap_num": action_penalization / self.ap}
-
-        return obs, designed_reward, done, info
 
 
 if __name__ == "__main__":

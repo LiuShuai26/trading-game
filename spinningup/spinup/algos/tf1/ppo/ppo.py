@@ -195,12 +195,13 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # Tensorflow Summary Ops
     def build_summaries():
         summaries = []
+
         EpRet = tf.Variable(0.)
         EpRet_target_bias = tf.Variable(0.)
         EpRet_score = tf.Variable(0.)
-        EpApNum = tf.Variable(0.)
+        EpRet_ap = tf.Variable(0.)
         EpTarget_bias = tf.Variable(0.)
-        Target_bias_per_step = tf.Variable(0.)
+        EpTarget_bias_per_step = tf.Variable(0.)
         EpScore = tf.Variable(0.)
 
         Action0 = tf.Variable(0.)
@@ -233,9 +234,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
         summaries.append(tf.summary.scalar("EpRet_score", EpRet_score))
-        summaries.append(tf.summary.scalar("EpApNum", EpApNum))
+        summaries.append(tf.summary.scalar("EpRet_ap", EpRet_ap))
         summaries.append(tf.summary.scalar("EpTarget_bias", EpTarget_bias))
-        summaries.append(tf.summary.scalar("Target_bias_per_step", Target_bias_per_step))
+        summaries.append(tf.summary.scalar("EpTarget_bias_per_step", EpTarget_bias_per_step))
         summaries.append(tf.summary.scalar("EpScore", EpScore))
 
         summaries.append(tf.summary.scalar("Action0", Action0))
@@ -254,7 +255,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("Action13", Action13))
         summaries.append(tf.summary.scalar("Action14", Action14))
         summaries.append(tf.summary.scalar("Action15", Action15))
-        summaries.append(tf.summary.scalar("Action15", Action16))
+        summaries.append(tf.summary.scalar("Action16", Action16))
 
         summaries.append(tf.summary.scalar("VVals", VVals))
         summaries.append(tf.summary.scalar("LossPi", LossPi))
@@ -265,15 +266,36 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("KL", KL))
         summaries.append(tf.summary.scalar("ClipFrac", ClipFrac))
 
-        test_ops = tf.summary.merge(summaries)
-        test_vars = [EpRet, EpRet_target_bias, EpRet_score, EpApNum, EpTarget_bias, Target_bias_per_step, EpScore]
-        test_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
+        test_summaries = []
+
+        TestRet = tf.Variable(0.)
+        TestRet_target_bias = tf.Variable(0.)
+        TestRet_score = tf.Variable(0.)
+        TestRet_ap = tf.Variable(0.)
+        TestTarget_bias = tf.Variable(0.)
+        TestTarget_bias_per_step = tf.Variable(0.)
+        TestScore = tf.Variable(0.)
+
+        test_summaries.append(tf.summary.scalar("TestReward", TestRet))
+        test_summaries.append(tf.summary.scalar("TestRet_target_bias", TestRet_target_bias))
+        test_summaries.append(tf.summary.scalar("TestRet_score", TestRet_score))
+        test_summaries.append(tf.summary.scalar("TestRet_ap", TestRet_ap))
+        test_summaries.append(tf.summary.scalar("TestTarget_bias", TestTarget_bias))
+        test_summaries.append(tf.summary.scalar("TestTarget_bias_per_step", TestTarget_bias_per_step))
+        test_summaries.append(tf.summary.scalar("TestScore", TestScore))
+
+        train_data_ops = tf.summary.merge(summaries)
+        train_data_vars = [EpRet, EpRet_target_bias, EpRet_score, EpRet_ap, EpTarget_bias, EpTarget_bias_per_step, EpScore]
+        train_data_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
                       Action10, Action11, Action12, Action13, Action14, Action15, Action16]
-        test_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac]
-        return test_ops, test_vars
+        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac]
+
+        test_data_ops = tf.summary.merge(test_summaries)
+        test_data_vars = [TestRet, TestRet_target_bias, TestRet_score, TestRet_ap, TestTarget_bias, TestTarget_bias_per_step, TestScore]
+        return train_data_ops, train_data_vars, test_data_ops, test_data_vars
 
     # Set up summary Ops
-    test_ops, test_vars = build_summaries()
+    train_data_ops, train_data_vars, test_data_ops, test_data_vars = build_summaries()
 
     # Experience buffer
     local_steps_per_epoch = int(steps_per_epoch / num_procs())
@@ -300,7 +322,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     train_v = MpiAdamOptimizer(learning_rate=vf_lr).minimize(v_loss)
 
     config = tf.ConfigProto()
-    config.gpu_options.per_process_gpu_memory_fraction = 0.05
+    # config.gpu_options.per_process_gpu_memory_fraction = 0.05
+    config.gpu_options.allow_growth = True
     config.inter_op_parallelism_threads = 1
     config.intra_op_parallelism_threads = 1
     sess = tf.Session(config=config)
@@ -313,7 +336,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     if proc_id() == 0:
         writer = tf.summary.FileWriter(
-            summary_dir + "/" + str(datetime.datetime.now()) + "-" + exp_name, sess.graph)
+            summary_dir + "/" + str(datetime.datetime.now()).replace(" ", "-") + "-" + exp_name, sess.graph)
     # Setup model saving
     logger.setup_tf_saver(sess, inputs={'x': x_ph}, outputs={'pi': pi, 'v': v})
 
@@ -338,6 +361,36 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(pi_l_new - pi_l_old),
                      DeltaLossV=(v_l_new - v_l_old))
+
+    def test():
+        get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
+        for start_day in range(63-8+proc_id(), 63, 8):
+            o, r, d, test_ret, test_len = env.reset(start_day=start_day, start_skip=0, duration=None, burn_in=0), 0, False, 0, 0
+            test_target_bias, test_reward_target_bias, test_reward_score, test_reward_apnum = 0, 0, 0, 0
+            while True:
+                a = get_action(o)
+                o, r, d, info = env.step(a)
+                test_ret += r
+                test_len += 1
+                test_target_bias += info["target_bias"]
+                test_reward_target_bias += info["reward_target_bias"]
+                test_reward_score += info["reward_score"]
+                test_reward_apnum += info["reward_ap_num"]
+
+                # if d or test_len == 3000:   # for fast debug
+                if d:
+                    logger.store(AverageTestRet=test_ret,
+                                 TestRet_target_bias=test_reward_target_bias,
+                                 TestRet_score=test_reward_score,
+                                 TestRet_ap=test_reward_apnum,
+                                 TestTarget_bias=test_target_bias,
+                                 TestTarget_bias_per_step=test_target_bias / test_len,
+                                 TestScore=info["score"],
+                                 TestLen=test_len)
+                    print("Day", start_day, "Profit:", info["profit"], "Score:", info["score"])
+                    break
+        # after test we need reset the env
+        o, ep_ret, ep_len = env.reset(start_day=None, start_skip=None, duration=None, burn_in=0), 0, 0
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -379,10 +432,11 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     logger.store(AverageEpRet=ep_ret,
                                  EpRet_target_bias=ep_reward_target_bias,
                                  EpRet_score=ep_reward_score,
-                                 EpApNum=ep_apnum,
+                                 EpRet_ap=ep_apnum,
                                  EpTarget_bias=ep_target_bias,
-                                 Target_bias_per_step=ep_target_bias / ep_len,
-                                 EpScore=ep_score,
+                                 EpTarget_bias_per_step=ep_target_bias / ep_len,
+                                 # EpScore=ep_score,
+                                 EpScore=info['score'],
                                  EpLen=ep_len)
 
                     logger.store(Action0=env.act_sta[0],
@@ -416,9 +470,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_ep_ret = logger.get_stats('AverageEpRet')[0]
         tb_ret_target_bias = logger.get_stats('EpRet_target_bias')[0]
         tb_ret_score = logger.get_stats('EpRet_score')[0]
-        tb_apnum = logger.get_stats('EpApNum')[0]
+        tb_apnum = logger.get_stats('EpRet_ap')[0]
         tb_target_bias = logger.get_stats('EpTarget_bias')[0]
-        tb_target_bias_per_step = logger.get_stats('Target_bias_per_step')[0]
+        tb_target_bias_per_step = logger.get_stats('EpTarget_bias_per_step')[0]
         tb_score = logger.get_stats('EpScore')[0]
 
         tb_action0 = logger.get_stats('Action0')[0]
@@ -449,66 +503,51 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_clipfrac = logger.get_stats('ClipFrac')[0]
 
         if proc_id() == 0:
-            summary_str = sess.run(test_ops, feed_dict={
-                test_vars[0]: tb_ep_ret,
-                test_vars[1]: tb_ret_target_bias,
-                test_vars[2]: tb_ret_score,
-                test_vars[3]: tb_apnum,
-                test_vars[4]: tb_target_bias,
-                test_vars[5]: tb_target_bias_per_step,
-                test_vars[6]: tb_score,
-                test_vars[7]: tb_action0,
-                test_vars[8]: tb_action1,
-                test_vars[9]: tb_action2,
-                test_vars[10]: tb_action3,
-                test_vars[11]: tb_action4,
-                test_vars[12]: tb_action5,
-                test_vars[13]: tb_action6,
-                test_vars[14]: tb_action7,
-                test_vars[15]: tb_action8,
-                test_vars[16]: tb_action9,
-                test_vars[17]: tb_action10,
-                test_vars[18]: tb_action11,
-                test_vars[19]: tb_action12,
-                test_vars[20]: tb_action13,
-                test_vars[21]: tb_action14,
-                test_vars[22]: tb_action15,
-                test_vars[23]: tb_action16,
-                test_vars[24]: tb_vvals,
-                test_vars[25]: tb_losspi,
-                test_vars[26]: tb_lossv,
-                test_vars[27]: tb_deltalosspi,
-                test_vars[28]: tb_deltalossv,
-                test_vars[29]: tb_entropy,
-                test_vars[30]: tb_kl,
-                test_vars[31]: tb_clipfrac,
+            summary_str = sess.run(train_data_ops, feed_dict={
+                train_data_vars[0]: tb_ep_ret,
+                train_data_vars[1]: tb_ret_target_bias,
+                train_data_vars[2]: tb_ret_score,
+                train_data_vars[3]: tb_apnum,
+                train_data_vars[4]: tb_target_bias,
+                train_data_vars[5]: tb_target_bias_per_step,
+                train_data_vars[6]: tb_score,
+                train_data_vars[7]: tb_action0,
+                train_data_vars[8]: tb_action1,
+                train_data_vars[9]: tb_action2,
+                train_data_vars[10]: tb_action3,
+                train_data_vars[11]: tb_action4,
+                train_data_vars[12]: tb_action5,
+                train_data_vars[13]: tb_action6,
+                train_data_vars[14]: tb_action7,
+                train_data_vars[15]: tb_action8,
+                train_data_vars[16]: tb_action9,
+                train_data_vars[17]: tb_action10,
+                train_data_vars[18]: tb_action11,
+                train_data_vars[19]: tb_action12,
+                train_data_vars[20]: tb_action13,
+                train_data_vars[21]: tb_action14,
+                train_data_vars[22]: tb_action15,
+                train_data_vars[23]: tb_action16,
+                train_data_vars[24]: tb_vvals,
+                train_data_vars[25]: tb_losspi,
+                train_data_vars[26]: tb_lossv,
+                train_data_vars[27]: tb_deltalosspi,
+                train_data_vars[28]: tb_deltalossv,
+                train_data_vars[29]: tb_entropy,
+                train_data_vars[30]: tb_kl,
+                train_data_vars[31]: tb_clipfrac,
             })
             writer.add_summary(summary_str, total_steps)
             writer.flush()
 
-        # Save model
-        # save model every save_freq(25M) steps
-        if total_steps > 4e6:
-            if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
-                max_saved_steps = total_steps // save_freq
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
-            # save model if lower than the min_score. min_score start from 150.
-            elif tb_score < min_score:
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
-                min_score = tb_score
-            # save model if lower than the min_score. min_score start from 150.
-            elif tb_score < 50:
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=tb_score)
-                min_score = tb_score
-
         # Log info about epoch
-        logger.log_tabular('Epoch', epoch)
+        logger.log_tabular('Epoch', epoch+1)
         logger.log_tabular('AverageEpRet', tb_ep_ret)
         logger.log_tabular('EpRet_target_bias', tb_ret_target_bias)
         logger.log_tabular('EpRet_score', tb_ret_score)
-        logger.log_tabular('EpApNum', tb_apnum)
+        logger.log_tabular('EpRet_ap', tb_apnum)
         logger.log_tabular('EpTarget_bias', with_min_and_max=True)
-        logger.log_tabular('Target_bias_per_step', tb_target_bias_per_step)
+        logger.log_tabular('EpTarget_bias_per_step', tb_target_bias_per_step)
         logger.log_tabular('EpScore', with_min_and_max=True)
         logger.log_tabular('EpLen', average_only=True)
         logger.log_tabular('VVals', with_min_and_max=True)
@@ -525,6 +564,52 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch) / (time.time() - start_time))
         logger.log_tabular('ExpName', exp_name)
         logger.dump_tabular()
+
+        # if True:          # for fast debug
+        if (epoch+1) % 15 == 0:
+            test()
+
+            test_ep_ret = logger.get_stats('AverageTestRet')[0]
+            test_ret_target_bias = logger.get_stats('TestRet_target_bias')[0]
+            test_ret_score = logger.get_stats('TestRet_score')[0]
+            test_reward_apnum = logger.get_stats('TestRet_ap')[0]
+            test_target_bias = logger.get_stats('TestTarget_bias')[0]
+            test_target_bias_per_step = logger.get_stats('TestTarget_bias_per_step')[0]
+            test_score = logger.get_stats('TestScore')[0]
+
+            if proc_id() == 0:
+                summary_str = sess.run(test_data_ops, feed_dict={
+                    test_data_vars[0]: test_ep_ret,
+                    test_data_vars[1]: test_ret_target_bias,
+                    test_data_vars[2]: test_ret_score,
+                    test_data_vars[3]: test_reward_apnum,
+                    test_data_vars[4]: test_target_bias,
+                    test_data_vars[5]: test_target_bias_per_step,
+                    test_data_vars[6]: test_score,
+                })
+                writer.add_summary(summary_str, total_steps)
+                writer.flush()
+
+            logger.log_tabular('Epoch', epoch+1)
+            logger.log_tabular('AverageTestRet', test_ep_ret)
+            logger.log_tabular('TestRet_target_bias', test_ret_target_bias)
+            logger.log_tabular('TestRet_score', test_ret_score)
+            logger.log_tabular('TestRet_ap', test_reward_apnum)
+            logger.log_tabular('TestTarget_bias', test_target_bias)
+            logger.log_tabular('TestTarget_bias_per_step', test_target_bias_per_step)
+            logger.log_tabular('TestScore', test_score)
+            logger.log_tabular('TestLen', average_only=True)
+            logger.dump_tabular()
+
+            # save model every save_freq(25M) steps
+            if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
+                max_saved_steps = total_steps // save_freq
+                logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
+
+            # save model if lower than the min_score. min_score start from 150.
+            if test_score < min_score:
+                logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
+                min_score = test_score
 
 
 if __name__ == '__main__':
