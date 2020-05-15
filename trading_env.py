@@ -81,9 +81,9 @@ class TradingEnv(gym.Env):
         else:
             assert start_skip < max_point, 'start_skip is too large!'
 
-        print("-------------env reset-------------")
-        print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
-              data_len[day_index], "burn_in:", burn_in, "ml:", self.max_ep_len)
+        # print("-------------env reset-------------")
+        # print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
+        #       data_len[day_index], "burn_in:", burn_in, "ml:", self.max_ep_len)
 
         start_info = {"date_index": "{} - {}".format(start_day, start_day), "skip_steps": start_skip}
 
