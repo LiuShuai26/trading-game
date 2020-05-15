@@ -4,7 +4,8 @@ from gym import spaces
 from gym.spaces import Box
 import ctypes
 import json
-import os, sys
+import os
+import sys
 from collections import deque
 import pandas as pd
 import time
@@ -34,8 +35,7 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, action_scheme_id=21, reward_ratio=(1.0, 1.0, 1.0), target_reward_clip=3.0, select_obs=True,
-                 render=False):
+    def __init__(self, action_scheme_id=21, select_obs=True, render=False, max_ep_len=3000):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -59,17 +59,7 @@ class TradingEnv(gym.Env):
         self.obs_ori_dim = 38 if self.select_obs else 44
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.obs_ori_dim,), dtype=np.float32)
 
-        self.max_ep_len = 0
-
-        self.start_day = None
-        self.start_skip = None
-
-        self.target_diffs = 0
-
-        self.target_scale = reward_ratio[0]
-        self.target_reward_clip = target_reward_clip
-        self.score_scale = reward_ratio[1]
-        self.act_penal_scale = reward_ratio[2]
+        self.max_ep_len = max_ep_len
 
         self.render = render
 
@@ -91,12 +81,9 @@ class TradingEnv(gym.Env):
         else:
             assert start_skip < max_point, 'start_skip is too large!'
 
-        self.start_day = start_day
-        self.start_skip = start_skip
-
-        # print("-------------env reset-------------")
-        # print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
-        #       data_len[day_index], "burn_in:", burn_in, "ml:", self.max_ep_len)
+        print("-------------env reset-------------")
+        print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
+              data_len[day_index], "burn_in:", burn_in, "ml:", self.max_ep_len)
 
         start_info = {"date_index": "{} - {}".format(start_day, start_day), "skip_steps": start_skip}
 
@@ -116,46 +103,15 @@ class TradingEnv(gym.Env):
 
     def step(self, action):
 
-        last_score = self.rewards[0]
-
         self._step(action)
         self.expso.Step(self.ctx)
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
         obs = self._get_obs(self.raw_obs)
+        reward = None
         done = bool(self.raw_obs[0])
-
-        # get_reward
-        step_score = self.rewards[0] - last_score
-        reward_score = - self.score_scale * step_score
-
-        target_bias = self.raw_obs[27] - self.raw_obs[26]
-        reward_target = - self.target_scale * np.maximum(0.0, np.abs(target_bias) - self.target_reward_clip) ** 2
-
-        act_penal = 0.0 if action == 0 else 1.0
-        reward_action = - self.act_penal_scale * act_penal
-
-        reward = reward_target + reward_score + reward_action
-
-        # get_info
-        self.target_diffs += np.abs(target_bias)
-        info = {"TradingDay": self.raw_obs[25],
-                "price": self.raw_obs[1],
-                "profit": self.rewards[1],
-                "total_profit": self.rewards[2],
-                "baseline_profit": self.rewards[3],
-                "step_score": step_score,
-                "score": self.rewards[0],
-                "reward_score": reward_score,
-                "target_bias": target_bias,
-                "reward_target": reward_target,
-                "reward_action": reward_action,
-                "act_penal": act_penal,
-                "target_diffs": self.target_diffs,
-                "start_day": self.start_day,
-                "start_skip": self.start_skip,
-                }
+        info = {}
 
         if self.render:
             self.rendering(action)

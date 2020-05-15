@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import gym
 import time
 import sys
 sys.path.append("/home/shuai/trading-game/spinningup/")
@@ -324,8 +323,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     config = tf.ConfigProto()
     # config.gpu_options.per_process_gpu_memory_fraction = 0.05
     config.gpu_options.allow_growth = True
-    config.inter_op_parallelism_threads = 1
-    config.intra_op_parallelism_threads = 1
+    # config.inter_op_parallelism_threads = 1
+    # config.intra_op_parallelism_threads = 1
     sess = tf.Session(config=config)
     # sess = tf.Session()
 
@@ -387,10 +386,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  TestTarget_bias_per_step=test_target_bias / test_len,
                                  TestScore=info["score"],
                                  TestLen=test_len)
-                    print("Day", start_day, "Profit:", info["profit"], "Score:", info["score"])
+                    print("Day", start_day, "Len:", test_len, "Profit:", info["profit"], "Score:", info["score"])
                     break
         # after test we need reset the env
-        o, ep_ret, ep_len = env.reset(start_day=None, start_skip=None, duration=None, burn_in=0), 0, 0
+        o, ep_ret, ep_len = env.reset(), 0, 0
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -661,7 +660,7 @@ if __name__ == '__main__':
     from trading_env import TradingEnv, FrameStack
     from wrapper import EnvWrapper
 
-    env = TradingEnv(action_scheme_id=action_scheme_id)
+    env = TradingEnv(action_scheme_id=action_scheme_id, max_ep_len=args.max_ep_len)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack)
 
