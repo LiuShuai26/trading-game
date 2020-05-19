@@ -65,7 +65,7 @@ class TradingEnv(gym.Env):
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         # set random seed every time
-        np.random.seed()
+        # np.random.seed()
         # random start_day if no start_day
         if start_day is None:
             num_days = len(data_len)

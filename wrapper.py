@@ -86,7 +86,6 @@ class EnvWrapper(gym.Wrapper):
         # target_clip = round(target_now * 0.05)
         reward_target_bias = max(0, reward_target_bias - self.target_clip)
         reward_target_bias *= self.target_scale
-        reward_target_bias = abs(target_bias) if not self.target_delay else reward_target_bias
 
         action_penalization = 0 if action == 0 else 1
 
