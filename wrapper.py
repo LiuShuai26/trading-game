@@ -37,10 +37,11 @@ class EnvWrapper(gym.Wrapper):
 
     def _env_skip(self):
         for _ in range(self.burn_in):
-            action_index = self.baseline069(self.raw_obs)
+            # action_index = self.baseline069(self.raw_obs)
+            action_index = 0
             self.env.expso.Action(self.ctx, self.actions[action_index])
             self.env.expso.Step(self.ctx)
-            self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
+        # self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
@@ -89,7 +90,7 @@ class EnvWrapper(gym.Wrapper):
 
         action_penalization = 0 if action == 0 else 1
 
-        designed_reward = -(reward_target_bias + self.ap * action_penalization + reward_score)
+        designed_reward = -(self.ap * action_penalization + reward_score)
 
         self.act_sta[action] += 1
 

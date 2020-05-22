@@ -102,7 +102,9 @@ class TradingEnv(gym.Env):
         return obs
 
     def step(self, action):
-
+        # use baseline_policy if target_diff is larger than clip.
+        if abs(self.raw_obs[27] - self.raw_obs[26]) > 10:
+            action = self.baseline_policy(self._get_obs(self.raw_obs))
         self._step(action)
         self.expso.Step(self.ctx)
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
@@ -111,7 +113,11 @@ class TradingEnv(gym.Env):
         obs = self._get_obs(self.raw_obs)
         reward = None
         done = bool(self.raw_obs[0])
-        info = {}
+        target_bias = self.raw_obs[27] - self.raw_obs[26]
+        info = {"TradingDay": self.raw_obs[25],
+                "score": self.rewards[0],
+                "profit": self.rewards[1],
+                "target_bias": target_bias}
 
         if self.render:
             self.rendering(action)

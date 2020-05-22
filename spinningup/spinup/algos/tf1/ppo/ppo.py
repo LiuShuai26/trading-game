@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import sys
-# sys.path.append("/home/shuai/trading-game/spinningup/")
+sys.path.append("/home/shuai/trading-game/spinningup/")
 import spinup.algos.tf1.ppo.core as core
 from spinup.utils.logx import EpochLogger
 from spinup.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
