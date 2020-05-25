@@ -35,7 +35,7 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, action_scheme_id=21, select_obs=True, render=False, max_ep_len=3000):
+    def __init__(self, action_scheme_id=21, auto_follow=0, select_obs=True, render=False, max_ep_len=3000):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -54,6 +54,7 @@ class TradingEnv(gym.Env):
         self.rewards_len = arr()
 
         self._step = self._action_schemes(action_scheme_id)
+        self.auto_follow = auto_follow
 
         self.select_obs = select_obs
         self.obs_ori_dim = 38 if self.select_obs else 44
@@ -102,9 +103,16 @@ class TradingEnv(gym.Env):
         return obs
 
     def step(self, action):
-        # use baseline_policy if target_diff is larger than clip.
-        if abs(self.raw_obs[27] - self.raw_obs[26]) > 10:
-            action = self.baseline_policy(self._get_obs(self.raw_obs))
+        target_num = self.raw_obs[26]
+        actual_num = self.raw_obs[27]
+
+        if self.auto_follow is not 0:
+            if abs(actual_num - target_num) > self.auto_follow:
+                if target_num > actual_num:
+                    action = 6
+                else:
+                    action = 9
+
         self._step(action)
         self.expso.Step(self.ctx)
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)

@@ -41,7 +41,7 @@ class EnvWrapper(gym.Wrapper):
             action_index = 0
             self.env.expso.Action(self.ctx, self.actions[action_index])
             self.env.expso.Step(self.ctx)
-        # self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
+        self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
