@@ -90,7 +90,7 @@ class EnvWrapper(gym.Wrapper):
 
         action_penalization = 0 if action == 0 else 1
 
-        designed_reward = -(self.ap * action_penalization + reward_score)
+        designed_reward = -(reward_target_bias + self.ap * action_penalization + reward_score)
 
         self.act_sta[action] += 1
 
