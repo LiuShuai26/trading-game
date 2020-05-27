@@ -640,7 +640,7 @@ if __name__ == '__main__':
     # pi_lr = 4e-5
     # vf_lr = 1e-5
 
-    action_scheme_id = 15
+    action_scheme_id = 3
     auto_follow = 0  # 0 mean false
 
     exp_name = args.exp_name
