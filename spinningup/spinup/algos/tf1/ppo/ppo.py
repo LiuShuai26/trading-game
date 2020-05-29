@@ -363,7 +363,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
-        for start_day in range(63-8+proc_id(), 63, 8):
+        for start_day in range(proc_id()+1, 8+1, 8):
             o, r, d, test_ret, test_len = env.reset(start_day=start_day, start_skip=0, duration=None, burn_in=0), 0, False, 0, 0
             test_target_bias, test_reward_target_bias, test_reward_score, test_reward_apnum = 0, 0, 0, 0
             while True:
