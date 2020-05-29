@@ -628,6 +628,8 @@ if __name__ == '__main__':
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
     parser.add_argument('--target_clip', type=int, default=0)
+    parser.add_argument('--auto_follow', type=int, default=0)
+    parser.add_argument('--action_scheme', type=int, default=3)
     parser.add_argument('--max_ep_len', type=int, default=3000)
     parser.add_argument('--exp_name', type=str, default='ppo-test')
     args = parser.parse_args()
@@ -637,14 +639,9 @@ if __name__ == '__main__':
     duration = None
     pi_lr = 4e-5
     vf_lr = 1e-4
-    # pi_lr = 4e-5
-    # vf_lr = 1e-5
-
-    action_scheme_id = 3
-    auto_follow = 0  # 0 mean false
 
     exp_name = args.exp_name
-    exp_name += "as" + str(action_scheme_id) + "auto_follow=" + str(auto_follow) + "burn_in-" + str(args.burn_in)
+    exp_name += "as" + str(args.action_scheme) + "auto_follow=" + str(args.auto_follow) + "burn_in-" + str(args.burn_in)
     # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
     exp_name += "-fs=" + str(args.num_stack)
     exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
@@ -661,7 +658,7 @@ if __name__ == '__main__':
     from trading_env import TradingEnv, FrameStack
     from wrapper import EnvWrapper
 
-    env = TradingEnv(action_scheme_id=action_scheme_id, auto_follow=auto_follow,  max_ep_len=args.max_ep_len)
+    env = TradingEnv(action_scheme_id=args.action_scheme, auto_follow=args.auto_follow,  max_ep_len=args.max_ep_len)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack)
 
