@@ -8,6 +8,7 @@ import os
 import sys
 from collections import deque
 import pandas as pd
+import pickle
 import time
 
 expso = "/home/shuai/trading-game/rl_game/game/"
@@ -61,8 +62,10 @@ class TradingEnv(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.obs_ori_dim,), dtype=np.float32)
 
         self.max_ep_len = max_ep_len
-
         self.render = render
+
+        with open("/home/shuai/trading-game/data_scaler.pkl", 'rb') as file:
+            self.scaler = pickle.load(file)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         # set random seed every time
@@ -95,7 +98,7 @@ class TradingEnv(gym.Env):
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self._get_obs(self.raw_obs)
+        obs = self._get_obs_sk(self.raw_obs)
 
         if self.render:
             self.rendering()
@@ -118,7 +121,7 @@ class TradingEnv(gym.Env):
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self._get_obs(self.raw_obs)
+        obs = self._get_obs_sk(self.raw_obs)
         reward = None
         done = bool(self.raw_obs[0])
         target_bias = self.raw_obs[27] - self.raw_obs[26]
@@ -131,6 +134,16 @@ class TradingEnv(gym.Env):
             self.rendering(action)
 
         return obs, reward, done, info
+
+    def _get_obs_sk(self, raw_obs):
+
+        obs = np.array(raw_obs[:44], dtype=np.float32)
+        obs = np.delete(obs, [0, 25, 34, 35, 42, 43])
+
+        # normalize data
+        obs = self.scaler.transform(obs.reshape(1, -1))[0]
+
+        return obs
 
     def _get_obs(self, raw_obs):
         price_mean = 26871.05
@@ -315,6 +328,7 @@ if __name__ == "__main__":
         # print("burn-in steps:", cnt)
 
         print(env.raw_obs[26], env.raw_obs[27])
+        print(obs)
         step = 1
         t0 = time.time()
         price = 0.0
@@ -325,11 +339,11 @@ if __name__ == "__main__":
             obs, reward, done, info = env.step(action)
             step += 1
             if step % 10 == 0:
-                print(step, env.raw_obs[26], env.raw_obs[27], info["price"],
-                      (info["profit"], info["total_profit"], info["baseline_profit"]),
-                      (info["baseline_profit"] - info["profit"]) * 10 / info["target_diffs"], info["score"],
-                      (info["reward_score"], info["reward_target"], info["reward_action"],))
-
+                # print(step, env.raw_obs[26], env.raw_obs[27],
+                #       (info["profit"], info["total_profit"], info["baseline_profit"]),
+                #       (info["baseline_profit"] - info["profit"]) * 10 / info["target_diffs"], info["score"],
+                #       (info["reward_score"], info["reward_target"], info["reward_action"],))
+                print(obs)
             # if price != info["price"]:
             #     print('='*66)
             #     price = info["price"]
