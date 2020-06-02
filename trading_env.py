@@ -296,7 +296,7 @@ class FrameStack(gym.Wrapper):
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         ob = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
         ob = np.float32(ob)
-        for _ in range(self.frame_stack):
+        for _ in range(self.total_frame):
             self.frames.append(ob)
         return self.observation()
 
