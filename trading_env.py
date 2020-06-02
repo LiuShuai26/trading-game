@@ -284,10 +284,12 @@ class TradingEnv(gym.Env):
 
 
 class FrameStack(gym.Wrapper):
-    def __init__(self, env, frame_stack):
+    def __init__(self, env, frame_stack, jump=1):
         super(FrameStack, self).__init__(env)
         self.frame_stack = frame_stack
-        self.frames = deque([], maxlen=self.frame_stack)
+        self.jump = jump
+        self.total_frame = frame_stack*jump
+        self.frames = deque([], maxlen=self.total_frame)
         self.obs_dim = self.env.observation_space.shape[0] * frame_stack
         self.observation_space = Box(-np.inf, np.inf, shape=(self.obs_dim,), dtype=np.float32)
 
@@ -305,8 +307,11 @@ class FrameStack(gym.Wrapper):
         return self.observation(), reward, done, info
 
     def observation(self):
-        assert len(self.frames) == self.frame_stack
-        return np.stack(self.frames, axis=0).reshape((self.obs_dim,))
+        assert len(self.frames) == self.total_frame
+        obs_stack = np.array(self.frames)
+        idx = np.arange(0, self.total_frame, self.jump)
+        obs = obs_stack[idx]
+        return np.stack(obs, axis=0).reshape((self.obs_dim,))
 
 
 if __name__ == "__main__":
