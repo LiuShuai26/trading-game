@@ -54,7 +54,9 @@ class EnvWrapper(gym.Wrapper):
                                  start_skip=self.start_skip,
                                  duration=self.duration,
                                  burn_in=self.burn_in)
-        self._env_skip()
+        if self.burn_in:
+            self._env_skip()
+            obs = self.env.get_obs_sk(self.raw_obs)
         return obs
 
     def step(self, action):

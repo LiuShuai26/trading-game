@@ -395,7 +395,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
-    min_score = 150
+    min_score = 180
     max_saved_steps = 0
 
     # Main loop: collect experience in env and update/log each epoch
@@ -566,6 +566,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
         # if True:          # for fast debug
         if (epoch+1) % 15 == 0:
+
+            if (epoch + 1) % 70 == 0:
+                min_score = 150
+
             test()
 
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
@@ -629,7 +633,7 @@ if __name__ == '__main__':
     parser.add_argument('--delay_len', type=int, default=30)
     parser.add_argument('--target_clip', type=int, default=0)
     parser.add_argument('--auto_follow', type=int, default=0)
-    parser.add_argument('--action_scheme', type=int, default=3)
+    parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--max_ep_len', type=int, default=3000)
     parser.add_argument('--exp_name', type=str, default='ppo-test')
     args = parser.parse_args()
@@ -655,18 +659,23 @@ if __name__ == '__main__':
     logger_kwargs = setup_logger_kwargs(exp_name, args.seed)
 
     sys.path.append("/home/shuai/trading-game")
-    from trading_env import TradingEnv, FrameStack
-    from wrapper import EnvWrapper
+    # from trading_env import TradingEnv, FrameStack
+    # from wrapper import EnvWrapper
+    from new_env import TradingEnv, FrameStack
 
-    env = TradingEnv(action_scheme_id=args.action_scheme, auto_follow=args.auto_follow,  max_ep_len=args.max_ep_len)
+    # env = TradingEnv(action_scheme_id=args.action_scheme, auto_follow=args.auto_follow,  max_ep_len=args.max_ep_len)
+    env = TradingEnv(action_scheme_id=args.action_scheme, max_ep_len=args.max_ep_len, score_scale=args.score_scale)
+
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack)
 
-    ppo(lambda: EnvWrapper(env, delay_len=args.delay_len, target_scale=args.target_scale, score_scale=args.score_scale,
-                           action_punish=args.ap, target_clip=args.target_clip, start_day=start_day,
-                           start_skip=start_skip,
-                           duration=duration, burn_in=args.burn_in, target_delay=True),
+    ppo(lambda: env,
         actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[600, 800, 600]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name)
+
+# EnvWrapper(env, delay_len=args.delay_len, target_scale=args.target_scale, score_scale=args.score_scale,
+#                            action_punish=args.ap, target_clip=args.target_clip, start_day=start_day,
+#                            start_skip=start_skip,
+#                            duration=duration, burn_in=args.burn_in, target_delay=True)

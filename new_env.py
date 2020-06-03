@@ -8,7 +8,6 @@ import os
 import sys
 from collections import deque
 import pandas as pd
-import pickle
 import time
 
 expso = "/home/shuai/trading-game/rl_game/game/"
@@ -36,7 +35,9 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, action_scheme_id=21, auto_follow=0, select_obs=True, render=False, max_ep_len=3000):
+    def __init__(self, action_scheme_id=21, select_obs=True, render=False,
+                 max_ep_len=3000, delay_len=30, target_clip=0, target_scale=1, score_scale=1, action_punish=0.5,
+                 burn_in=3000):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -54,8 +55,7 @@ class TradingEnv(gym.Env):
         self.rewards = arr1()
         self.rewards_len = arr()
 
-        self._step = self._action_schemes(action_scheme_id)
-        self.auto_follow = auto_follow
+        self._make_actions = self._action_schemes(action_scheme_id)
 
         self.select_obs = select_obs
         self.obs_ori_dim = 38 if self.select_obs else 44
@@ -64,30 +64,47 @@ class TradingEnv(gym.Env):
         self.max_ep_len = max_ep_len
         self.render = render
 
-        with open("/home/shuai/trading-game/data_scaler.pkl", 'rb') as file:
-            self.scaler = pickle.load(file)
+        self.burn_in = burn_in
+        # target
+        self.target_diff = deque(maxlen=delay_len)  # target delay setting
+        self.target_clip = target_clip
+        # reward
+        self.target_scale = target_scale
+        self.score_scale = score_scale
+        self.ap = action_punish
+        # statistic
+        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
+                        15: 0, 16: 0}
 
-    def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
+    def _env_skip(self):
+        for _ in range(self.burn_in):
+            # action_index = self.baseline069(self.raw_obs)
+            action_index = 0
+            self.expso.Action(self.ctx, self.actions[action_index])
+            self.expso.Step(self.ctx)
+        self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
+        self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
+
+    def reset(self, start_day=None, start_skip=None, duration=None):
+
+        self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
+                        15: 0, 16: 0}
         # set random seed every time
         # np.random.seed()
+
         # random start_day if no start_day
         if start_day is None:
             num_days = len(data_len)
             start_day = np.random.randint(0, num_days, 1)[0] + 1
         # random start_skip if no start_skip
         day_index = start_day - 1
-        max_point = data_len[day_index] - self.max_ep_len - burn_in
+        max_point = data_len[day_index] - self.max_ep_len - self.burn_in
         if start_skip is None:
             start_skip = int(np.random.randint(0, max_point, 1)[0])
-        elif duration is not None:
-            assert start_skip + duration < max_point, 'start_skip or end_skip is too large!'
-            start_skip = int(np.random.randint(start_skip, start_skip + duration, 1)[0])
-        else:
-            assert start_skip < max_point, 'start_skip is too large!'
 
-        # print("-------------env reset-------------")
-        # print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
-        #       data_len[day_index], "burn_in:", burn_in, "ml:", self.max_ep_len)
+        print("-------------env reset-------------")
+        print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
+              data_len[day_index], "burn_in:", self.burn_in, "ml:", self.max_ep_len)
 
         start_info = {"date_index": "{} - {}".format(start_day, start_day), "skip_steps": start_skip}
 
@@ -98,7 +115,9 @@ class TradingEnv(gym.Env):
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self.get_obs_sk(self.raw_obs)
+        obs = self._get_obs(self.raw_obs)
+        if start_day is None:
+            self._env_skip()
 
         if self.render:
             self.rendering()
@@ -106,46 +125,67 @@ class TradingEnv(gym.Env):
         return obs
 
     def step(self, action):
-        target_num = self.raw_obs[26]
-        actual_num = self.raw_obs[27]
 
-        if self.auto_follow is not 0:
-            if abs(actual_num - target_num) > self.auto_follow:
-                if target_num > actual_num:
-                    action = 6
-                else:
-                    action = 9
+        last_target = self.raw_obs[26]
+        last_bias = self.raw_obs[26] - self.raw_obs[27]
+        last_score = self.rewards[0]
 
-        self._step(action)
+        self._make_actions(action)
         self.expso.Step(self.ctx)
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self.get_obs_sk(self.raw_obs)
-        reward = None
+        obs = self._get_obs(self.raw_obs)
+
+        target_now = self.raw_obs[26]
+        actual_target = self.raw_obs[27]
+        target_bias = target_now - actual_target
+
+        # target bias
+        reward_target_bias = abs(target_bias)
+
+        # apply target delay
+        # self.target_diff是长度为【10】的队列，存放target每次的差值。队列中的target_diff的总和就是当前总容忍度
+        # 与上一步的target差值相比，同号且绝对值变小，代表target向实际target靠近，此target变化不应给惩罚延迟
+        if not (last_bias * target_bias >= 0 and abs(last_bias) > abs(target_bias)):
+            self.target_diff.append(abs(target_now - last_target))
+        target_tolerance = sum(self.target_diff)
+        reward_target_bias = max(0, reward_target_bias - target_tolerance)
+
+        # apply target clip
+        # target_clip = round(target_now * 0.05)
+        reward_target_bias = max(0, reward_target_bias - self.target_clip)
+
+        # final reward target bias
+        reward_target_bias *= self.target_scale
+
+        action_penalization = 0 if action == 0 else 1
+
+        one_step_score = self.rewards[0] - last_score
+        reward_score = one_step_score * self.score_scale
+
+        designed_reward = -(reward_score + reward_target_bias + self.ap * action_penalization)
+
         done = bool(self.raw_obs[0])
-        target_bias = self.raw_obs[27] - self.raw_obs[26]
+
+        self.act_sta[action] += 1
+
         info = {"TradingDay": self.raw_obs[25],
-                "score": self.rewards[0],
+                "LastPrice": self.raw_obs[1],
                 "profit": self.rewards[1],
-                "target_bias": target_bias}
+                "one_step_score": one_step_score,
+                "score": self.rewards[0],
+                "target_bias": abs(target_bias),
+                "reward_score": reward_score,
+                "reward_target_bias": reward_target_bias,
+                "reward_ap_num": action_penalization}
 
         if self.render:
             self.rendering(action)
 
-        return obs, reward, done, info
+        return obs, designed_reward, done, info
 
-    def get_obs_sk(self, raw_obs):
-
-        obs = np.array(raw_obs[:44], dtype=np.float32)
-        obs = np.delete(obs, [0, 25, 34, 35, 42, 43])
-
-        # normalize data
-        obs = self.scaler.transform(obs.reshape(1, -1))[0]
-
-        return obs
-
-    def get_obs(self, raw_obs):
+    def _get_obs(self, raw_obs):
         price_mean = 26871.05
         price_max = 28540.0
         bid_ask_volume_log_mean = 2.05
@@ -178,26 +218,6 @@ class TradingEnv(gym.Env):
     def _action_schemes(self, action_scheme_id):
 
         schemes = {}
-
-        def scheme3(action):
-            assert 0 <= action <= 2 or action == 6 or action == 9, "action should be 0,1,2"
-            if action == 1:
-                self.expso.Action(self.ctx, self.actions[18])  # 如果是买动作，卖方向全撤。
-                self.expso.Action(self.ctx, self.actions[6])
-            elif action == 2:
-                self.expso.Action(self.ctx, self.actions[15])  # 如果是卖动作，买方向全撤。
-                self.expso.Action(self.ctx, self.actions[9])
-            elif action == 0:
-                self.expso.Action(self.ctx, self.actions[action])
-            # for auto_clip
-            elif action == 6:
-                self.expso.Action(self.ctx, self.actions[18])
-                self.expso.Action(self.ctx, self.actions[6])
-            elif action == 9:
-                self.expso.Action(self.ctx, self.actions[15])
-                self.expso.Action(self.ctx, self.actions[9])
-
-        schemes[3] = scheme3
 
         # 根据买卖方向进行自动反方向撤单操作
         def scheme15(action):
@@ -293,8 +313,8 @@ class FrameStack(gym.Wrapper):
         self.obs_dim = self.env.observation_space.shape[0] * frame_stack
         self.observation_space = Box(-np.inf, np.inf, shape=(self.obs_dim,), dtype=np.float32)
 
-    def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
-        ob = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
+    def reset(self, start_day=None, start_skip=None, duration=None):
+        ob = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration)
         ob = np.float32(ob)
         for _ in range(self.total_frame):
             self.frames.append(ob)
@@ -316,47 +336,26 @@ class FrameStack(gym.Wrapper):
 
 if __name__ == "__main__":
 
-    env = TradingEnv()
-    # env = FrameStack(env, frame_stack=3)
+    env = TradingEnv(action_scheme_id=15, max_ep_len=3000, score_scale=2, burn_in=0)
+    # env = FrameStack(env, frame_stack=3, jump=5)
 
     cnt = 0
 
     for i in range(1):
-
         obs = env.reset()
-
-        # burn-in
-        # while env.target_diffs < 50:
-        #     action = env.baseline_policy(obs)
-        #     obs, reward, done, info = env.step(action)
-        #     cnt += 1
-        # print("burn-in steps:", cnt)
-
-        print(env.raw_obs[26], env.raw_obs[27])
-        print(obs)
+        # print(obs)
         step = 1
         t0 = time.time()
-        price = 0.0
+
         while True:
             # action = env.action_space.sample()
             action = env.baseline_policy(obs)
             # action = 0
             obs, reward, done, info = env.step(action)
+            # print(obs, obs.shape)
             step += 1
-            if step % 10 == 0:
-                # print(step, env.raw_obs[26], env.raw_obs[27],
-                #       (info["profit"], info["total_profit"], info["baseline_profit"]),
-                #       (info["baseline_profit"] - info["profit"]) * 10 / info["target_diffs"], info["score"],
-                #       (info["reward_score"], info["reward_target"], info["reward_action"],))
-                print(obs)
-            # if price != info["price"]:
-            #     print('='*66)
-            #     price = info["price"]
-            if done or step == 1000000:
-                print("Done!", done, cnt, step, 'time:', time.time() - t0)
-                # all_data = env.all_data
-                # all_data_df = pd.DataFrame(all_data)
-                # print(all_data_df.tail())
+            if done or step == 1000:
+                print("Done!", cnt, step, 'time:', time.time() - t0)
                 break
 
     env.close_env()
