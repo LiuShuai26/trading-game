@@ -102,9 +102,9 @@ class TradingEnv(gym.Env):
         if start_skip is None:
             start_skip = int(np.random.randint(0, max_point, 1)[0])
 
-        print("-------------env reset-------------")
-        print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
-              data_len[day_index], "burn_in:", self.burn_in, "ml:", self.max_ep_len)
+        # print("-------------env reset-------------")
+        # print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
+        #       data_len[day_index], "burn_in:", self.burn_in, "ml:", self.max_ep_len)
 
         start_info = {"date_index": "{} - {}".format(start_day, start_day), "skip_steps": start_skip}
 
@@ -118,6 +118,7 @@ class TradingEnv(gym.Env):
         obs = self._get_obs(self.raw_obs)
         if start_day is None:
             self._env_skip()
+        # obs = self._get_obs(self.raw_obs)
 
         if self.render:
             self.rendering()
