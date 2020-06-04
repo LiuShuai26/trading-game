@@ -11,7 +11,7 @@ import pandas as pd
 import pickle
 import time
 
-expso = "/home/shuai/trading-game/rl_game/game/"
+expso = "/home/shuai/trading-game/rl_game/game_au/"
 
 os.chdir(expso)
 
@@ -26,11 +26,11 @@ info_names = [
 ]
 
 data_len = [
-    225016, 225018, 225018, 225018, 225018, 225017, 225018, 225016, 225014, 225016, 225016, 225018, 225018, 225015,
-    225018, 225016, 177490, 225016, 225018, 225016, 225016, 225016, 225018, 225016, 225018, 225018, 225016, 225016,
-    225016, 225018, 225018, 225016, 225016, 225018, 225016, 225016, 225018, 225016, 225016, 225015, 225016, 225016,
-    225016, 225016, 192623, 225018, 225018, 225016, 225016, 225016, 225016, 225018, 225016, 225018, 225016, 225016,
-    225016, 225016, 99006, 225016, 225018, 99010
+    27005, 27004, 27005, 27004, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005,
+    27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005,
+    27005, 26984, 27005, 27004, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27004, 27005,
+    27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27005, 27003, 27004, 66606, 66607, 66606,
+    66607, 66606
 ]
 
 
@@ -98,7 +98,7 @@ class TradingEnv(gym.Env):
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self._get_obs_sk(self.raw_obs)
+        obs = self._get_obs(self.raw_obs)
 
         if self.render:
             self.rendering()
@@ -121,7 +121,7 @@ class TradingEnv(gym.Env):
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self._get_obs_sk(self.raw_obs)
+        obs = self._get_obs(self.raw_obs)
         reward = None
         done = bool(self.raw_obs[0])
         target_bias = self.raw_obs[27] - self.raw_obs[26]
@@ -134,16 +134,6 @@ class TradingEnv(gym.Env):
             self.rendering(action)
 
         return obs, reward, done, info
-
-    def _get_obs_sk(self, raw_obs):
-
-        obs = np.array(raw_obs[:44], dtype=np.float32)
-        obs = np.delete(obs, [0, 25, 34, 35, 42, 43])
-
-        # normalize data
-        obs = self.scaler.transform(obs.reshape(1, -1))[0]
-
-        return obs
 
     def _get_obs(self, raw_obs):
         price_mean = 26871.05
