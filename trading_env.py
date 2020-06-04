@@ -98,7 +98,7 @@ class TradingEnv(gym.Env):
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self._get_obs_sk(self.raw_obs)
+        obs = self._get_obs(self.raw_obs)
 
         if self.render:
             self.rendering()
@@ -121,7 +121,7 @@ class TradingEnv(gym.Env):
         self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-        obs = self._get_obs_sk(self.raw_obs)
+        obs = self._get_obs(self.raw_obs)
         reward = None
         done = bool(self.raw_obs[0])
         target_bias = self.raw_obs[27] - self.raw_obs[26]
@@ -134,16 +134,6 @@ class TradingEnv(gym.Env):
             self.rendering(action)
 
         return obs, reward, done, info
-
-    def _get_obs_sk(self, raw_obs):
-
-        obs = np.array(raw_obs[:44], dtype=np.float32)
-        obs = np.delete(obs, [0, 25, 34, 35, 42, 43])
-
-        # normalize data
-        obs = self.scaler.transform(obs.reshape(1, -1))[0]
-
-        return obs
 
     def _get_obs(self, raw_obs):
         price_mean = 26871.05

@@ -185,8 +185,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # Main outputs from computation graph
     pi, logp, logp_pi, v = actor_critic(x_ph, a_ph, **ac_kwargs)
 
+    learning_rate = tf.placeholder(tf.float32, shape=[])
+
     # Need all placeholders in *this* order later (to zip with data from buffer)
-    all_phs = [x_ph, a_ph, adv_ph, ret_ph, logp_old_ph]
+    all_phs = [x_ph, a_ph, adv_ph, ret_ph, logp_old_ph, learning_rate]
 
     # Every step, get: action, value, and logprob
     get_action_ops = [pi, v, logp_pi]
@@ -229,6 +231,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         Entropy = tf.Variable(0.)
         KL = tf.Variable(0.)
         ClipFrac = tf.Variable(0.)
+        lr = tf.Variable(0.)
 
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
@@ -264,6 +267,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("Entropy", Entropy))
         summaries.append(tf.summary.scalar("KL", KL))
         summaries.append(tf.summary.scalar("ClipFrac", ClipFrac))
+        summaries.append(tf.summary.scalar("lr", lr))
 
         test_summaries = []
 
@@ -287,7 +291,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         train_data_vars = [EpRet, EpRet_target_bias, EpRet_score, EpRet_ap, EpTarget_bias, EpTarget_bias_per_step, EpScore]
         train_data_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
                       Action10, Action11, Action12, Action13, Action14, Action15, Action16]
-        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac]
+        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr]
 
         test_data_ops = tf.summary.merge(test_summaries)
         test_data_vars = [TestRet, TestRet_target_bias, TestRet_score, TestRet_ap, TestTarget_bias, TestTarget_bias_per_step, TestScore]
@@ -317,8 +321,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     clipfrac = tf.reduce_mean(tf.cast(clipped, tf.float32))
 
     # Optimizers
-    train_pi = MpiAdamOptimizer(learning_rate=pi_lr).minimize(pi_loss)
-    train_v = MpiAdamOptimizer(learning_rate=vf_lr).minimize(v_loss)
+    train_pi = MpiAdamOptimizer(learning_rate=learning_rate).minimize(pi_loss)
+    train_v = MpiAdamOptimizer(learning_rate=learning_rate).minimize(v_loss)
 
     config = tf.ConfigProto()
     # config.gpu_options.per_process_gpu_memory_fraction = 0.05
@@ -339,8 +343,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # Setup model saving
     logger.setup_tf_saver(sess, inputs={'x': x_ph}, outputs={'pi': pi, 'v': v})
 
-    def update():
-        inputs = {k: v for k, v in zip(all_phs, buf.get())}
+    def update(epoch):
+        inputs = {k: v for k, v in zip(all_phs[:-1], buf.get())}
+        decay_learning_rate = pi_lr * (0.96 ** (epoch // 15))
+        inputs[all_phs[-1]] = decay_learning_rate
         pi_l_old, v_l_old, ent = sess.run([pi_loss, v_loss, approx_ent], feed_dict=inputs)
 
         # Training
@@ -359,7 +365,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.store(LossPi=pi_l_old, LossV=v_l_old,
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(pi_l_new - pi_l_old),
-                     DeltaLossV=(v_l_new - v_l_old))
+                     DeltaLossV=(v_l_new - v_l_old), lr=decay_learning_rate)
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
@@ -463,7 +469,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         total_steps = (epoch + 1) * steps_per_epoch
 
         # Perform PPO update!
-        update()
+        update(epoch)
 
         # tensorboard writting
         tb_ep_ret = logger.get_stats('AverageEpRet')[0]
@@ -500,6 +506,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_entropy = logger.get_stats('Entropy')[0]
         tb_kl = logger.get_stats('KL')[0]
         tb_clipfrac = logger.get_stats('ClipFrac')[0]
+        tb_lr = logger.get_stats('lr')[0]
 
         if proc_id() == 0:
             summary_str = sess.run(train_data_ops, feed_dict={
@@ -535,6 +542,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 train_data_vars[29]: tb_entropy,
                 train_data_vars[30]: tb_kl,
                 train_data_vars[31]: tb_clipfrac,
+                train_data_vars[32]: tb_lr,
             })
             writer.add_summary(summary_str, total_steps)
             writer.flush()
@@ -558,6 +566,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('Entropy', average_only=True)
         logger.log_tabular('KL', average_only=True)
         logger.log_tabular('ClipFrac', average_only=True)
+        logger.log_tabular('lr', average_only=True)
         logger.log_tabular('StopIter', average_only=True)
         logger.log_tabular('Time', time.time() - start_time)
         logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch) / (time.time() - start_time))
