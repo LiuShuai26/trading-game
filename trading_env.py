@@ -274,14 +274,18 @@ class TradingEnv(gym.Env):
 
 
 class FrameStack(gym.Wrapper):
-    def __init__(self, env, frame_stack, jump=1):
+    def __init__(self, env, frame_stack, jump=1, model='mlp'):
         super(FrameStack, self).__init__(env)
         self.frame_stack = frame_stack
         self.jump = jump
+        self.model = model
         self.total_frame = frame_stack*jump
         self.frames = deque([], maxlen=self.total_frame)
-        self.obs_dim = self.env.observation_space.shape[0] * frame_stack
-        self.observation_space = Box(-np.inf, np.inf, shape=(self.obs_dim,), dtype=np.float32)
+        if model == 'mlp':
+            self.obs_dim = self.env.observation_space.shape[0] * frame_stack
+            self.observation_space = Box(-np.inf, np.inf, shape=(self.obs_dim,), dtype=np.float32)
+        else:
+            self.observation_space = Box(-np.inf, np.inf, shape=(frame_stack, self.env.observation_space.shape[0]), dtype=np.float32)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         ob = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
@@ -301,13 +305,16 @@ class FrameStack(gym.Wrapper):
         obs_stack = np.array(self.frames)
         idx = np.arange(0, self.total_frame, self.jump)
         obs = obs_stack[idx]
-        return np.stack(obs, axis=0).reshape((self.obs_dim,))
+        if self.model == 'mlp':
+            return np.stack(obs, axis=0).reshape((self.obs_dim,))
+        else:
+            return obs
 
 
 if __name__ == "__main__":
 
     env = TradingEnv()
-    # env = FrameStack(env, frame_stack=3)
+    env = FrameStack(env, frame_stack=200, jump=3, model='cnn')
 
     cnt = 0
 
@@ -322,14 +329,14 @@ if __name__ == "__main__":
         #     cnt += 1
         # print("burn-in steps:", cnt)
 
-        print(env.raw_obs[26], env.raw_obs[27])
-        print(obs)
+        # print(env.raw_obs[26], env.raw_obs[27])
+        print(obs.shape)
         step = 1
         t0 = time.time()
         price = 0.0
         while True:
-            # action = env.action_space.sample()
-            action = env.baseline_policy(obs)
+            action = env.action_space.sample()
+            # action = env.baseline_policy(obs)
             # action = 0
             obs, reward, done, info = env.step(action)
             step += 1
@@ -338,11 +345,11 @@ if __name__ == "__main__":
                 #       (info["profit"], info["total_profit"], info["baseline_profit"]),
                 #       (info["baseline_profit"] - info["profit"]) * 10 / info["target_diffs"], info["score"],
                 #       (info["reward_score"], info["reward_target"], info["reward_action"],))
-                print(obs)
+                print(obs.shape)
             # if price != info["price"]:
             #     print('='*66)
             #     price = info["price"]
-            if done or step == 1000000:
+            if done or step == 100:
                 print("Done!", done, cnt, step, 'time:', time.time() - t0)
                 # all_data = env.all_data
                 # all_data_df = pd.DataFrame(all_data)

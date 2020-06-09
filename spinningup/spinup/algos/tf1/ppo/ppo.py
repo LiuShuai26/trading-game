@@ -85,8 +85,8 @@ class PPOBuffer:
 
 
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
-        steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-        vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
+        steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4,
+        train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, exp_name='exp', summary_dir="/home/shuai/tb"):
     """
     Proximal Policy Optimization (by clipping), 
@@ -137,7 +137,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             on the objective anymore. (Usually small, 0.1 to 0.3.) Typically
             denoted by :math:`\epsilon`. 
 
-        pi_lr (float): Learning rate for policy optimizer.
+        lr (float): Learning rate.
 
         vf_lr (float): Learning rate for value function optimizer.
 
@@ -345,7 +345,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     def update(epoch):
         inputs = {k: v for k, v in zip(all_phs[:-1], buf.get())}
-        decay_learning_rate = pi_lr * (0.96 ** (epoch // 15))
+
+        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
         inputs[all_phs[-1]] = decay_learning_rate
         pi_l_old, v_l_old, ent = sess.run([pi_loss, v_loss, approx_ent], feed_dict=inputs)
 
@@ -407,7 +408,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
         for t in range(local_steps_per_epoch):
-            a, v_t, logp_t = sess.run(get_action_ops, feed_dict={x_ph: o.reshape(1, -1)})
+            a, v_t, logp_t = sess.run(get_action_ops, feed_dict={x_ph: o[np.newaxis, ...]})
 
             o2, r, d, info = env.step(a[0])
             ep_ret += r
@@ -430,7 +431,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 if not (terminal):
                     print('Warning: trajectory cut off by epoch at %d steps.' % ep_len)
                 # if trajectory didn't reach terminal state, bootstrap value target
-                last_val = 0 if d else sess.run(v, feed_dict={x_ph: o.reshape(1, -1)})
+                last_val = 0 if d else sess.run(v, feed_dict={x_ph: o[np.newaxis, ...]})
                 buf.finish_path(last_val)
                 if terminal:
                     # only save EpRet / EpLen if trajectory finished
@@ -625,6 +626,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='Trading')
+    parser.add_argument('--model', type=str, default='mlp')
+    parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=8)
@@ -636,26 +639,28 @@ if __name__ == '__main__':
     parser.add_argument('--ap', type=float, default=0.5)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=0)
+    parser.add_argument('--target_clip', type=int, default=5)
     parser.add_argument('--auto_follow', type=int, default=0)
-    parser.add_argument('--action_scheme', type=int, default=3)
+    parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--max_ep_len', type=int, default=3000)
     parser.add_argument('--exp_name', type=str, default='ppo-test')
     args = parser.parse_args()
 
+    assert args.model in ['mlp', 'cnn'], "model must be mlp or cnn"
+
     start_day = None
     start_skip = None
     duration = None
-    pi_lr = 4e-5
-    vf_lr = 1e-4
+    lr = 5e-5
 
     exp_name = args.exp_name
-    exp_name += "as" + str(args.action_scheme) + "auto_follow=" + str(args.auto_follow) + "burn_in-" + str(args.burn_in)
+    exp_name += "-model=" + args.model + str(args.hidden_sizes)
+    exp_name += "-as" + str(args.action_scheme) + "-auto_follow=" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
     # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
     exp_name += "-fs=" + str(args.num_stack)
     exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
     exp_name += "dl=" + str(args.delay_len) + "clip=" + str(args.target_clip)
-    exp_name += "-pilr=" + str(pi_lr) + "-vlr=" + str(vf_lr)
+    exp_name += "-lr=" + str(lr)
 
     mpi_fork(args.cpu, bind_to_core=False, cpu_set="")  # run parallel code with mpi
 
@@ -669,13 +674,18 @@ if __name__ == '__main__':
 
     env = TradingEnv(action_scheme_id=args.action_scheme, auto_follow=args.auto_follow,  max_ep_len=args.max_ep_len)
     if args.num_stack > 1:
-        env = FrameStack(env, args.num_stack)
+        env = FrameStack(env, args.num_stack, jump=3, model=args.model)
+
+    if args.model == 'mlp':
+        actor_critic = core.mlp_actor_critic
+    else:
+        actor_critic = core.cnn_actor_critic
 
     ppo(lambda: EnvWrapper(env, delay_len=args.delay_len, target_scale=args.target_scale, score_scale=args.score_scale,
                            action_punish=args.ap, target_clip=args.target_clip, start_day=start_day,
                            start_skip=start_skip,
                            duration=duration, burn_in=args.burn_in, target_delay=True),
-        actor_critic=core.mlp_actor_critic,
-        ac_kwargs=dict(hidden_sizes=[600, 800, 600]), gamma=args.gamma, pi_lr=pi_lr, vf_lr=vf_lr,
+        actor_critic=actor_critic,
+        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name)
