@@ -39,10 +39,13 @@ def mlp(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None):
 
 
 def cnn(x, hidden_sizes=(32,), activation="relu", output_activation=None):
-
     for h in hidden_sizes[:-1]:
-        x = tf.keras.layers.Conv1D(filters=h, kernel_size=2, activation=activation)(x)
+        x = tf.keras.layers.Conv1D(filters=h, kernel_size=3, strides=2, activation=activation)(x)
+        print(x)
     x = tf.layers.Flatten()(x)
+    print(x)
+    x = tf.layers.dense(x, units=128, activation=activation)
+    print(x)
     return tf.layers.dense(x, units=hidden_sizes[-1], activation=output_activation)
 
 
@@ -95,7 +98,7 @@ def mlp_categorical_policy(x, a, hidden_sizes, activation, output_activation, ac
 
 def cnn_categorical_policy(x, a, hidden_sizes, activation, output_activation, action_space):
     act_dim = action_space.n
-    logits = cnn(x, list(hidden_sizes) + [act_dim], activation)
+    logits = cnn(x, list(hidden_sizes) + [act_dim], activation, None)
     logp_all = tf.nn.log_softmax(logits)
     pi = tf.squeeze(tf.multinomial(logits, 1), axis=1)
     logp = tf.reduce_sum(tf.one_hot(a, depth=act_dim) * logp_all, axis=1)
@@ -146,7 +149,7 @@ def mlp_actor_critic(x, a, hidden_sizes=(64, 64), activation=tf.tanh,
     return pi, logp, logp_pi, v
 
 
-def cnn_actor_critic(x, a, hidden_sizes=(64, 64), activation=tf.tanh,
+def cnn_actor_critic(x, a, hidden_sizes=(64, 64), activation='relu',
                      output_activation=None, policy=None, action_space=None):
     # default policy builder depends on action space
     if policy is None and isinstance(action_space, Box):

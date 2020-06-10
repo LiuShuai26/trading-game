@@ -347,7 +347,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         inputs = {k: v for k, v in zip(all_phs[:-1], buf.get())}
 
         decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
-        inputs[all_phs[-1]] = decay_learning_rate
+        # inputs[all_phs[-1]] = decay_learning_rate
+        inputs[all_phs[-1]] = lr
         pi_l_old, v_l_old, ent = sess.run([pi_loss, v_loss, approx_ent], feed_dict=inputs)
 
         # Training
@@ -575,7 +576,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.dump_tabular()
 
         # if True:          # for fast debug
-        if (epoch+1) % 15 == 0:
+        # if (epoch+1) % 15 == 0:
+        if False:
             test()
 
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
@@ -626,20 +628,20 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='Trading')
-    parser.add_argument('--model', type=str, default='mlp')
-    parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
+    parser.add_argument('--model', type=str, default='cnn')
+    parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[256, 256])
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--cpu', type=int, default=8)
-    parser.add_argument('--steps', type=int, default=72000)
+    parser.add_argument('--cpu', type=int, default=2)
+    parser.add_argument('--steps', type=int, default=6000)
     parser.add_argument('--epochs', type=int, default=3000)
-    parser.add_argument('--num_stack', type=int, default=1)
+    parser.add_argument('--num_stack', type=int, default=30)
     parser.add_argument('--target_scale', type=float, default=1)
-    parser.add_argument('--score_scale', type=float, default=1.5)
+    parser.add_argument('--score_scale', type=float, default=0)
     parser.add_argument('--ap', type=float, default=0.5)
     parser.add_argument('--burn_in', type=int, default=3000)
-    parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=5)
+    parser.add_argument('--delay_len', type=int, default=0)
+    parser.add_argument('--target_clip', type=int, default=0)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--max_ep_len', type=int, default=3000)
@@ -651,10 +653,10 @@ if __name__ == '__main__':
     start_day = None
     start_skip = None
     duration = None
-    lr = 5e-5
+    lr = 4e-5
 
     exp_name = args.exp_name
-    exp_name += "-model=" + args.model + str(args.hidden_sizes)
+    exp_name += "-model=" + args.model + str(args.hidden_sizes) + 'fc128'
     exp_name += "-as" + str(args.action_scheme) + "-auto_follow=" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
     # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
     exp_name += "-fs=" + str(args.num_stack)
