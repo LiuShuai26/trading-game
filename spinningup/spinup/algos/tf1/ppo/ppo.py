@@ -651,7 +651,7 @@ if __name__ == '__main__':
     start_day = None
     start_skip = None
     duration = None
-    lr = 5e-5
+    lr = 4e-5
 
     exp_name = args.exp_name
     exp_name += "-model=" + args.model + str(args.hidden_sizes)
