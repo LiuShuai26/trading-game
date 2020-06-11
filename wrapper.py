@@ -35,8 +35,8 @@ class EnvWrapper(gym.Wrapper):
             action = 0
         return action
 
-    def _env_skip(self):
-        for _ in range(self.burn_in):
+    def _env_skip(self, burn_in):
+        for _ in range(burn_in):
             # action_index = self.baseline069(self.raw_obs)
             action_index = 0
             self.env.expso.Action(self.ctx, self.actions[action_index])
@@ -49,12 +49,13 @@ class EnvWrapper(gym.Wrapper):
                         15: 0, 16: 0}
         if start_day is not None:
             obs = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
+            self._env_skip(burn_in)
         else:
             obs = self.env.reset(start_day=self.start_day,
                                  start_skip=self.start_skip,
                                  duration=self.duration,
                                  burn_in=self.burn_in)
-        self._env_skip()
+            self._env_skip(self.burn_in)
         return obs
 
     def step(self, action):

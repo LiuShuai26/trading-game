@@ -36,7 +36,7 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, action_scheme_id=21, auto_follow=0, select_obs=True, render=False, max_ep_len=3000):
+    def __init__(self, action_scheme_id=21, auto_follow=0, obs_dim=38, render=False, max_ep_len=3000):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -57,9 +57,8 @@ class TradingEnv(gym.Env):
         self._step = self._action_schemes(action_scheme_id)
         self.auto_follow = auto_follow
 
-        self.select_obs = select_obs
-        self.obs_ori_dim = 38 if self.select_obs else 44
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.obs_ori_dim,), dtype=np.float32)
+        self.obs_dim = obs_dim
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.obs_dim,), dtype=np.float32)
 
         self.max_ep_len = max_ep_len
         self.render = render
@@ -130,7 +129,7 @@ class TradingEnv(gym.Env):
                 "profit": self.rewards[1],
                 "target_bias": target_bias}
 
-        if self.render:
+        if self.render and self.obs_dim == 38:
             self.rendering(action)
 
         return obs, reward, done, info
@@ -144,13 +143,11 @@ class TradingEnv(gym.Env):
         total_volume_max = 175383.0
         target_mean = 20.69
         target_max = 485.0
-        price_filter = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23, 24, 28, 30, 32, 34, 36, 38]
-        bid_ask_volume_filter = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 29, 31, 33, 35, 37, 39]
+        price_filter = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23, 24, 28, 30, 32, 36, 38, 40]
+        bid_ask_volume_filter = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 29, 31, 33, 37, 39, 41]
         total_volume_filter = [22]
         target_filter = [26, 27]
         obs = np.array(raw_obs[:44], dtype=np.float32)
-
-        obs = np.delete(obs, [34, 35, 42, 43])
 
         obs[price_filter] = (obs[price_filter] - price_mean) / (price_max - price_mean)
         obs[bid_ask_volume_filter] = (np.log(obs[bid_ask_volume_filter]) - bid_ask_volume_log_mean) / (
@@ -159,7 +156,16 @@ class TradingEnv(gym.Env):
                 total_volume_max - total_volume_mean)
         obs[target_filter] = (obs[target_filter] - target_mean) / (target_max - target_mean)
 
-        obs = np.delete(obs, [0, 25])
+        if self.obs_dim == 38:
+            obs = np.delete(obs, [0, 25, 34, 35, 42, 43])
+        elif self.obs_dim == 26:
+            obs = obs[:28]
+            obs = np.delete(obs, [0, 25])
+        elif self.obs_dim == 24:
+            obs = obs[:25]
+            obs = np.delete(obs, [0])
+        else:
+            assert False, "incorrect obs_dim!"
         obs[obs < -1] = -1
         obs[obs > 1] = 1
 
@@ -313,8 +319,8 @@ class FrameStack(gym.Wrapper):
 
 if __name__ == "__main__":
 
-    env = TradingEnv()
-    env = FrameStack(env, frame_stack=200, jump=3, model='cnn')
+    env = TradingEnv(obs_dim=38)
+    # env = FrameStack(env, frame_stack=3, jump=3, model='cnn')
 
     cnt = 0
 
@@ -330,7 +336,7 @@ if __name__ == "__main__":
         # print("burn-in steps:", cnt)
 
         # print(env.raw_obs[26], env.raw_obs[27])
-        print(obs.shape)
+        print(obs)
         step = 1
         t0 = time.time()
         price = 0.0
@@ -345,7 +351,7 @@ if __name__ == "__main__":
                 #       (info["profit"], info["total_profit"], info["baseline_profit"]),
                 #       (info["baseline_profit"] - info["profit"]) * 10 / info["target_diffs"], info["score"],
                 #       (info["reward_score"], info["reward_target"], info["reward_action"],))
-                print(obs.shape)
+                print(obs)
             # if price != info["price"]:
             #     print('='*66)
             #     price = info["price"]

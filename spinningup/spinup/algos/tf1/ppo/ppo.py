@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import sys
+
 sys.path.append("/home/shuai/trading-game/spinningup/")
 import spinup.algos.tf1.ppo.core as core
 from spinup.utils.logx import EpochLogger
@@ -288,13 +289,15 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         test_summaries.append(tf.summary.scalar("TestScore", TestScore))
 
         train_data_ops = tf.summary.merge(summaries)
-        train_data_vars = [EpRet, EpRet_target_bias, EpRet_score, EpRet_ap, EpTarget_bias, EpTarget_bias_per_step, EpScore]
+        train_data_vars = [EpRet, EpRet_target_bias, EpRet_score, EpRet_ap, EpTarget_bias, EpTarget_bias_per_step,
+                           EpScore]
         train_data_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
-                      Action10, Action11, Action12, Action13, Action14, Action15, Action16]
+                            Action10, Action11, Action12, Action13, Action14, Action15, Action16]
         train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr]
 
         test_data_ops = tf.summary.merge(test_summaries)
-        test_data_vars = [TestRet, TestRet_target_bias, TestRet_score, TestRet_ap, TestTarget_bias, TestTarget_bias_per_step, TestScore]
+        test_data_vars = [TestRet, TestRet_target_bias, TestRet_score, TestRet_ap, TestTarget_bias,
+                          TestTarget_bias_per_step, TestScore]
         return train_data_ops, train_data_vars, test_data_ops, test_data_vars
 
     # Set up summary Ops
@@ -370,8 +373,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
-        for start_day in range(proc_id()+1, 8+1, 8):
-            o, r, d, test_ret, test_len = env.reset(start_day=start_day, start_skip=0, duration=None, burn_in=0), 0, False, 0, 0
+        for start_day in range(proc_id() + 1, 8 + 1, 8):
+            o, r, d, test_ret, test_len = env.reset(start_day=start_day, start_skip=0, duration=None,
+                                                    burn_in=0), 0, False, 0, 0
             test_target_bias, test_reward_target_bias, test_reward_score, test_reward_apnum = 0, 0, 0, 0
             while True:
                 a = get_action(o)
@@ -549,7 +553,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             writer.flush()
 
         # Log info about epoch
-        logger.log_tabular('Epoch', epoch+1)
+        logger.log_tabular('Epoch', epoch + 1)
         logger.log_tabular('AverageEpRet', tb_ep_ret)
         logger.log_tabular('EpRet_target_bias', tb_ret_target_bias)
         logger.log_tabular('EpRet_score', tb_ret_score)
@@ -575,7 +579,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.dump_tabular()
 
         # if True:          # for fast debug
-        if (epoch+1) % 15 == 0:
+        if (epoch + 1) % 15 == 0:
             test()
 
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
@@ -599,7 +603,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 writer.add_summary(summary_str, total_steps)
                 writer.flush()
 
-            logger.log_tabular('Epoch', epoch+1)
+            logger.log_tabular('Epoch', epoch + 1)
             logger.log_tabular('AverageTestRet', test_ep_ret)
             logger.log_tabular('TestRet_target_bias', test_ret_target_bias)
             logger.log_tabular('TestRet_score', test_ret_score)
@@ -654,8 +658,9 @@ if __name__ == '__main__':
     lr = 4e-5
 
     exp_name = args.exp_name
-    exp_name += "-model=" + args.model + str(args.hidden_sizes)
-    exp_name += "-as" + str(args.action_scheme) + "-auto_follow=" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
+    exp_name += "-model=" + args.model + str(args.hidden_sizes).replace(" ", "")
+    exp_name += "-as" + str(args.action_scheme) + "-auto_follow=" + str(args.auto_follow) + "-burn_in-" + str(
+        args.burn_in)
     # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
     exp_name += "-fs=" + str(args.num_stack)
     exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
@@ -672,7 +677,8 @@ if __name__ == '__main__':
     from trading_env import TradingEnv, FrameStack
     from wrapper import EnvWrapper
 
-    env = TradingEnv(action_scheme_id=args.action_scheme, auto_follow=args.auto_follow,  max_ep_len=args.max_ep_len)
+    env = TradingEnv(action_scheme_id=args.action_scheme, obs_dim=26, auto_follow=args.auto_follow,
+                     max_ep_len=args.max_ep_len)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack, jump=3, model=args.model)
 
