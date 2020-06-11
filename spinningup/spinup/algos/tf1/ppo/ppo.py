@@ -646,6 +646,7 @@ if __name__ == '__main__':
     parser.add_argument('--target_clip', type=int, default=5)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
+    parser.add_argument('--obs_dim', type=int, default=26)
     parser.add_argument('--max_ep_len', type=int, default=3000)
     parser.add_argument('--exp_name', type=str, default='ppo-test')
     args = parser.parse_args()
@@ -659,8 +660,8 @@ if __name__ == '__main__':
 
     exp_name = args.exp_name
     exp_name += "-model=" + args.model + str(args.hidden_sizes).replace(" ", "")
-    exp_name += "-as" + str(args.action_scheme) + "-auto_follow=" + str(args.auto_follow) + "-burn_in-" + str(
-        args.burn_in)
+    exp_name += "-obs_dim=" + str(args.obs_dim) + "-as" + str(args.action_scheme)
+    exp_name += "-auto_follow=" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
     # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
     exp_name += "-fs=" + str(args.num_stack)
     exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
@@ -677,7 +678,7 @@ if __name__ == '__main__':
     from trading_env import TradingEnv, FrameStack
     from wrapper import EnvWrapper
 
-    env = TradingEnv(action_scheme_id=args.action_scheme, obs_dim=26, auto_follow=args.auto_follow,
+    env = TradingEnv(action_scheme_id=args.action_scheme, obs_dim=args.obs_dim, auto_follow=args.auto_follow,
                      max_ep_len=args.max_ep_len)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack, jump=3, model=args.model)
