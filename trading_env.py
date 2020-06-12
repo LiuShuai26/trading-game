@@ -121,9 +121,9 @@ class TradingEnv(gym.Env):
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
         obs = self._get_obs(self.raw_obs)
-        reward = None
+        reward = 0
         done = bool(self.raw_obs[0])
-        target_bias = self.raw_obs[27] - self.raw_obs[26]
+        target_bias = abs(self.raw_obs[27] - self.raw_obs[26])
         info = {"TradingDay": self.raw_obs[25],
                 "score": self.rewards[0],
                 "profit": self.rewards[1],
