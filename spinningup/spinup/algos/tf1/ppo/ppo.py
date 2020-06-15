@@ -640,7 +640,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_stack', type=int, default=1)
     parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1.5)
-    parser.add_argument('--ap', type=float, default=0.5)
+    parser.add_argument('--ap', type=float, default=0.3)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
     parser.add_argument('--target_clip', type=int, default=5)
