@@ -6,13 +6,12 @@ from gym.spaces import Box
 
 
 class EnvWrapper(gym.Wrapper):
-    def __init__(self, env, delay_len=30, target_clip=0, target_scale=1, score_scale=1, action_punish=0.5,
-                 start_day=None, start_skip=None, duration=None, burn_in=3000, target_delay=True):
+    def __init__(self, env, delay_len=30, target_clip=5, target_scale=1, score_scale=1.5, action_punish=0.5,
+                 start_day=None, start_skip=None, duration=None, burn_in=3000):
         super(EnvWrapper, self).__init__(env)
         # target
         self.target_diff = deque(maxlen=delay_len)  # target delay setting
         self.target_clip = target_clip
-        self.target_delay = target_delay
         # reward
         self.target_scale = target_scale
         self.score_scale = score_scale
@@ -101,6 +100,8 @@ class EnvWrapper(gym.Wrapper):
                 "reward_score": reward_score,
                 "target_bias": abs(target_bias),
                 "reward_target_bias": reward_target_bias,
-                "reward_ap_num": action_penalization * self.ap}
+                "reward_ap_num": action_penalization * self.ap,
+                "target_total_tolerance": target_tolerance+self.target_clip,
+                }
 
         return obs, designed_reward, done, info

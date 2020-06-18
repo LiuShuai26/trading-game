@@ -36,7 +36,7 @@ data_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, action_scheme_id=21, auto_follow=0, obs_dim=38, render=False, max_ep_len=3000):
+    def __init__(self, action_scheme_id=21, auto_follow=0, obs_dim=38, render=False, max_ep_len=3000, trainning_set=54):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -63,6 +63,8 @@ class TradingEnv(gym.Env):
         self.max_ep_len = max_ep_len
         self.render = render
 
+        self.trainning_set = trainning_set
+
         with open("/home/shuai/trading-game/data_scaler.pkl", 'rb') as file:
             self.scaler = pickle.load(file)
 
@@ -72,7 +74,7 @@ class TradingEnv(gym.Env):
         # random start_day if no start_day
         if start_day is None:
             num_days = len(data_len)
-            start_day = np.random.randint(8, num_days, 1)[0] + 1
+            start_day = np.random.randint(num_days-self.trainning_set+1, num_days+1, 1)[0]   # default: test[1-8] train[9-62]
         # random start_skip if no start_skip
         day_index = start_day - 1
         max_point = data_len[day_index] - self.max_ep_len - burn_in
