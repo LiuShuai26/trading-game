@@ -1,11 +1,16 @@
-import numpy as np
-import os
-import pandas as pd
-import json
 import ctypes
-import matplotlib.pyplot as plt
+import json
+import os
+import sys
+import pandas as pd
+pd.set_option('display.max_columns', None)
 
-os.chdir("/home/shuai/trading-game/rl_game/game")
+# Root directory of the project
+ROOT_DIR = os.path.abspath("./")
+print(ROOT_DIR+"/rl_game/game")
+
+# import game.so
+os.chdir(ROOT_DIR+"/rl_game/game")
 soFile = "./game.so"
 expso = ctypes.cdll.LoadLibrary(soFile)
 
@@ -43,87 +48,91 @@ info_names = [
     "AliveBidPrice2",
     "AliveBidVolume2",
     "AliveBidPrice3",
-
     "AliveBidVolume3",
+    "AliveBidPriceNUM",
+    "AliveBidVolumeNUM",
     "AliveAskPrice1",
     "AliveAskVolume1",
     "AliveAskPrice2",
     "AliveAskVolume2",
     "AliveAskPrice3",
     "AliveAskVolume3",
-
+    "AliveAskPriceNUM",
+    "AliveAskVolumeNUM",
     "score",
     "profit",
     "total_profit",
+    "baseline_profit",
+    "close_profit",
     "action",
-    "reward"
 ]
-count = [
-    "AliveBidPriceNUM",
-    "AliveBidVolumeNUM",
-    "AliveAskPriceNUM",
-    "AliveAskVolumeNUM",
-]
+
+arr_len = 100
+arr1 = ctypes.c_int * arr_len
+arr = ctypes.c_int * 1
+
+actions = arr1()
+action_len = arr()
+infos = arr1()
+infos_len = arr()
+rewards = arr1()
+rewards_len = arr()
 
 all_data = []
 
-for start_day in range(1, 12):
+for start_day in range(1, 121):
 
-    arr_len = 100
-    arr1 = ctypes.c_int * arr_len
-    arr = ctypes.c_int * 1
+    day_data = []
 
-    actions = arr1()
-    action_len = arr()
-    infos = arr1()
-    infos_len = arr()
-    rewards = arr1()
-    rewards_len = arr()
-
-    start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": 10000}
+    start_info = {"date_index": f"{start_day} - {start_day}", "skip_steps": 0}
     ctx = expso.CreateContext(json.dumps(start_info).encode())
-    # print(start_info)
 
-    score = []
-    epscore = 0
-    last_score = 0
+    expso.GetInfo(ctx, infos, infos_len)
+    expso.GetReward(ctx, rewards, rewards_len)
 
     step = 1
+    action = 0
     while True:
 
         expso.GetInfo(ctx, infos, infos_len)
         expso.GetReward(ctx, rewards, rewards_len)
 
-        epscore += rewards[0]
-
-        score.append(rewards[0]-last_score)
-
-        last_score = rewards[0]
-
-        # print(infos[26])
-        # print(rewards[0], rewards[3])
-        # print(infos[1], infos[23])
-
-        # info_dict = {}
-        # for i in range(40):
-        #     info_dict[info_names[i]] = infos[i]
-        # for i in range(3):
-        #     info_dict[info_names[i + 40]] = rewards[i]
-        # all_data.append(info_dict)
+        info_dict = {}
+        for i in range(44):
+            info_dict[info_names[i]] = infos[i]
+        for i in range(5):
+            info_dict[info_names[i + 44]] = rewards[i]
+        info_dict[info_names[48]] = action
+        # print(info_dict)
+        day_data.append(info_dict)
+        all_data.append(info_dict)
 
         done = infos[0]
-        if done == 1 or step == 3000:
-            plt.plot(score)
-            plt.show()
-            print("step:", step)
+        if done == 1:
+            print("Day", infos[25], "data_len:", step)
+            day_data_df = pd.DataFrame(day_data)
+            day_data_df.to_csv(ROOT_DIR + "/r18-day" + str(start_day) + "-baseline_policy.csv")
+            print("r18-day" + str(start_day) + "data saved in " + ROOT_DIR + "/new-day" + str(
+                start_day) + "-baseline_policy.csv")
             expso.ReleaseContext(ctx)
             break
 
+        target_num = infos[26]
+        actual_num = infos[27]
+
+        action = 0
+
+        #         if abs(actual_num - target_num) > 5:
+        #             if target_num > actual_num:
+        #                 action = 6
+        #             else:
+        #                 action = 9
+
+        expso.Action(ctx, action)
         expso.Step(ctx)
         step += 1
-
-# print(len(all_data))
-# all_data_df = pd.DataFrame(all_data)
-# print(all_data_df.info())
-# all_data_df.to_csv("/home/shuai/day_1_no_action.csv", index=False)
-print("Done!")
+all_data_df = pd.DataFrame(all_data)
+print(all_data_df.tail())
+print(all_data_df.describe())
+all_data_df.to_csv(ROOT_DIR + "/r18-all_data-baseline_policy.csv")
+print("all_data saved in " + ROOT_DIR + "/r18-all_data-baseline_policy.csv")
