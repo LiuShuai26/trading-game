@@ -112,7 +112,7 @@ for start_day in range(1, 121):
             print("Day", infos[25], "data_len:", step)
             day_data_df = pd.DataFrame(day_data)
             day_data_df.to_csv(ROOT_DIR + "/r18-day" + str(start_day) + "-baseline_policy.csv")
-            print("r18-day" + str(start_day) + "data saved in " + ROOT_DIR + "/new-day" + str(
+            print("day" + str(start_day) + "data saved in " + ROOT_DIR + "/r18-day" + str(
                 start_day) + "-baseline_policy.csv")
             expso.ReleaseContext(ctx)
             break

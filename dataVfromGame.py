@@ -1,0 +1,143 @@
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib import style
+import pandas as pd
+pd.set_option('display.max_columns', None)
+from collections import deque
+import numpy as np
+import time
+import os.path as osp
+import tensorflow as tf
+import sys
+sys.path.append("/home/shuai/trading-game/spinningup/")
+from spinup.utils.logx import restore_tf_graph
+import argparse
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = ""
+
+
+class DataV:
+    def __init__(self, mode="game", csv_path="/home/shuai/day1-baseline_policy_au.csv"):
+        self.step = deque(maxlen=100)
+        self.last_price = deque(maxlen=100)
+        self.target = deque(maxlen=100)
+        self.actual_target = deque(maxlen=100)
+        self.action = deque(maxlen=100)
+        self.bid = deque(maxlen=100)
+        self.ask = deque(maxlen=100)
+        self.target_punish = deque(maxlen=100)
+
+        self.mode = mode
+        assert mode in ['game', 'csv'], "mode must be game or csv"
+        if mode is 'game':
+            self.env = self.make_env(num_stack=1, obs_dim=26, actions=15)
+            self.get_action = self.load_model()
+            self.o = None
+            print("successfully make env and load model!")
+        else:
+            self.csv_data = pd.read_csv(csv_path)
+            print("successfully load csv!")
+
+        # Create figure for plotting
+        self.fig, self.axes = plt.subplots(2, 2)
+
+    def make_env(self, num_stack, obs_dim, actions):
+        from trading_env import TradingEnv, FrameStack
+        from wrapper import EnvWrapper
+        env = TradingEnv(action_scheme_id=actions, obs_dim=obs_dim)
+        if num_stack > 1:
+            env = FrameStack(env, num_stack)
+        env = EnvWrapper(env)
+        return env
+
+    def load_model(self):
+        fpath = "/home/shuai/trading-game/spinningup/data/"
+        model = 'tf1_save174.960'
+        fname = osp.join(fpath, model)
+
+        print('\n\nLoading from %s.\n\n ' % fname)
+        # load the things!
+        sess = tf.Session()
+        model = restore_tf_graph(sess, fname)
+        print('Using default action op.')
+        action_op = model['pi']
+
+        # make function for producing an action given a single state
+        get_action = lambda x: sess.run(action_op, feed_dict={model['x']: x[None, :]})[0]
+        return get_action
+
+    # This function is called periodically from FuncAnimation
+    def animate(self, i):
+        if self.mode is 'game':
+            self.append_game_data(i)
+        else:
+            self.append_csv_data(i)
+
+        self.axes[0][0].clear()
+        self.axes[0][0].plot(self.step, self.last_price)
+        self.axes[0][0].scatter(self.step, self.last_price, c=self.ask, cmap="Greens", s=60)
+        self.axes[0][0].scatter(self.step, self.last_price, c=self.bid, cmap="Reds", s=30)
+
+        self.axes[1][0].clear()
+        self.axes[1][0].plot(self.step, self.target)
+        self.axes[1][0].plot(self.step, self.actual_target)
+        self.axes[1][0].scatter(self.step, np.array(self.target) + np.array(self.target_punish), marker="s", c='red', s=10)
+        self.axes[1][0].scatter(self.step, np.array(self.target) - np.array(self.target_punish), marker="s", c='red', s=10)
+
+        # for i in range(self.target_punish)
+
+        self.axes[0][1].clear()
+        self.axes[0][1].scatter(self.step, self.action, c=self.ask, cmap="Greens", s=60)
+        self.axes[0][1].scatter(self.step, self.action, c=self.bid, cmap="Reds", s=30)
+
+    def append_game_data(self, i):
+        if i == 0:
+            self.o = self.env.reset(start_day=1, start_skip=0)
+        a = self.get_action(self.o)
+        self.o, r, d, info = self.env.step(a)
+
+        self.step.append(i)
+        self.last_price.append(self.env.raw_obs[1])
+        self.target.append(self.env.raw_obs[26])
+        self.actual_target.append(self.env.raw_obs[27])
+        self.action.append(a)
+        self.target_punish.append(info['target_total_tolerance'])
+
+        if 1 <= a <= 7:
+            self.bid.append(8 - a + 10)
+            self.ask.append(0)
+        elif 8 <= a <= 14:
+            self.ask.append(a - 7 + 10)
+            self.bid.append(0)
+        else:
+            self.ask.append(0)
+            self.bid.append(0)
+
+    def append_csv_data(self, i):
+        self.step.append(i)
+        self.last_price.append(self.csv_data['LastPrice'].iloc[i])
+        self.target.append(self.csv_data['Target_Num'].iloc[i])
+        self.actual_target.append(self.csv_data['Actual_Num'].iloc[i])
+        a = self.csv_data['action'].iloc[i]
+        self.action.append(a)
+        if 1 <= a <= 7:
+            self.bid.append(8 - a + 10)
+            self.ask.append(0)
+        elif 8 <= a <= 14:
+            self.ask.append(a - 7 + 10)
+            self.bid.append(0)
+        else:
+            self.ask.append(0)
+            self.bid.append(0)
+
+    def show(self):
+
+        # Set up plot to call animate() function periodically
+        ani = animation.FuncAnimation(self.fig, self.animate, interval=1)
+        plt.show()
+
+
+if __name__ == '__main__':
+    testv = DataV(mode='game')
+    # testv = DataV(mode='csv')
+    testv.show()
