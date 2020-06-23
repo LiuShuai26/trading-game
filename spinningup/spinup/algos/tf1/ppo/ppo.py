@@ -660,14 +660,14 @@ if __name__ == '__main__':
     lr = 4e-5
 
     exp_name = args.exp_name
-    exp_name += "-trainning_set=" + args.trainning_set + "-model=" + args.model + str(args.hidden_sizes).replace(" ", "")
-    exp_name += "-obs_dim=" + str(args.obs_dim) + "-as" + str(args.action_scheme)
-    exp_name += "-auto_follow=" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
+    exp_name += "-trainning_set" + args.trainning_set + "-model" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
+    exp_name += "-obs_dim" + str(args.obs_dim) + "-as" + str(args.action_scheme)
+    exp_name += "-auto_follow" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
     # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
-    exp_name += "-fs=" + str(args.num_stack)
-    exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
-    exp_name += "dl=" + str(args.delay_len) + "clip=" + str(args.target_clip)
-    exp_name += "-lr=" + str(lr)
+    exp_name += "-fs" + str(args.num_stack)
+    exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
+    exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
+    exp_name += "-lr" + str(lr)
 
     mpi_fork(args.cpu, bind_to_core=False, cpu_set="")  # run parallel code with mpi
 
