@@ -2,12 +2,12 @@ import numpy as np
 import tensorflow as tf
 import time
 import sys
-
 sys.path.append("/home/shuai/trading-game/spinningup/")
 import spinup.algos.tf1.ppo.core as core
 from spinup.utils.logx import EpochLogger
 from spinup.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
 from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
+import subprocess
 import datetime
 
 
@@ -578,51 +578,54 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('ExpName', exp_name)
         logger.dump_tabular()
 
-        # if True:          # for fast debug
-        if (epoch + 1) % 15 == 0:
-            test()
-
-            test_ep_ret = logger.get_stats('AverageTestRet')[0]
-            test_ret_target_bias = logger.get_stats('TestRet_target_bias')[0]
-            test_ret_score = logger.get_stats('TestRet_score')[0]
-            test_reward_apnum = logger.get_stats('TestRet_ap')[0]
-            test_target_bias = logger.get_stats('TestTarget_bias')[0]
-            test_target_bias_per_step = logger.get_stats('TestTarget_bias_per_step')[0]
-            test_score = logger.get_stats('TestScore')[0]
-
-            if proc_id() == 0:
-                summary_str = sess.run(test_data_ops, feed_dict={
-                    test_data_vars[0]: test_ep_ret,
-                    test_data_vars[1]: test_ret_target_bias,
-                    test_data_vars[2]: test_ret_score,
-                    test_data_vars[3]: test_reward_apnum,
-                    test_data_vars[4]: test_target_bias,
-                    test_data_vars[5]: test_target_bias_per_step,
-                    test_data_vars[6]: test_score,
-                })
-                writer.add_summary(summary_str, total_steps)
-                writer.flush()
-
-            logger.log_tabular('Epoch', epoch + 1)
-            logger.log_tabular('AverageTestRet', test_ep_ret)
-            logger.log_tabular('TestRet_target_bias', test_ret_target_bias)
-            logger.log_tabular('TestRet_score', test_ret_score)
-            logger.log_tabular('TestRet_ap', test_reward_apnum)
-            logger.log_tabular('TestTarget_bias', test_target_bias)
-            logger.log_tabular('TestTarget_bias_per_step', test_target_bias_per_step)
-            logger.log_tabular('TestScore', test_score)
-            logger.log_tabular('TestLen', average_only=True)
-            logger.dump_tabular()
-
-            # save model every save_freq(25M) steps
-            if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
-                max_saved_steps = total_steps // save_freq
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
-
-            # save model if lower than the min_score. min_score start from 150.
-            if test_score < min_score:
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
-                min_score = test_score
+        if proc_id() == 0:          # for fast debug
+        # if (epoch + 1) % 15 == 0:
+            args = [sys.executable] + ['/home/shuai/trading-game/subptest.py', '--exp_name', exp_name]
+            child = subprocess.Popen(args)
+            print("###########Starting test!###########")
+            child.wait()
+            print("test end!")
+            # test_ep_ret = logger.get_stats('AverageTestRet')[0]
+            # test_ret_target_bias = logger.get_stats('TestRet_target_bias')[0]
+            # test_ret_score = logger.get_stats('TestRet_score')[0]
+            # test_reward_apnum = logger.get_stats('TestRet_ap')[0]
+            # test_target_bias = logger.get_stats('TestTarget_bias')[0]
+            # test_target_bias_per_step = logger.get_stats('TestTarget_bias_per_step')[0]
+            # test_score = logger.get_stats('TestScore')[0]
+            #
+            # if proc_id() == 0:
+            #     summary_str = sess.run(test_data_ops, feed_dict={
+            #         test_data_vars[0]: test_ep_ret,
+            #         test_data_vars[1]: test_ret_target_bias,
+            #         test_data_vars[2]: test_ret_score,
+            #         test_data_vars[3]: test_reward_apnum,
+            #         test_data_vars[4]: test_target_bias,
+            #         test_data_vars[5]: test_target_bias_per_step,
+            #         test_data_vars[6]: test_score,
+            #     })
+            #     writer.add_summary(summary_str, total_steps)
+            #     writer.flush()
+            #
+            # logger.log_tabular('Epoch', epoch + 1)
+            # logger.log_tabular('AverageTestRet', test_ep_ret)
+            # logger.log_tabular('TestRet_target_bias', test_ret_target_bias)
+            # logger.log_tabular('TestRet_score', test_ret_score)
+            # logger.log_tabular('TestRet_ap', test_reward_apnum)
+            # logger.log_tabular('TestTarget_bias', test_target_bias)
+            # logger.log_tabular('TestTarget_bias_per_step', test_target_bias_per_step)
+            # logger.log_tabular('TestScore', test_score)
+            # logger.log_tabular('TestLen', average_only=True)
+            # logger.dump_tabular()
+            #
+            # # save model every save_freq(25M) steps
+            # if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
+            #     max_saved_steps = total_steps // save_freq
+            #     logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
+            #
+            # # save model if lower than the min_score. min_score start from 150.
+            # if test_score < min_score:
+            #     logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
+            #     min_score = test_score
 
 
 if __name__ == '__main__':
@@ -660,14 +663,14 @@ if __name__ == '__main__':
     lr = 4e-5
 
     exp_name = args.exp_name
-    exp_name += "-trainning_set=" + args.trainning_set + "-model=" + args.model + str(args.hidden_sizes).replace(" ", "")
-    exp_name += "-obs_dim=" + str(args.obs_dim) + "-as" + str(args.action_scheme)
-    exp_name += "-auto_follow=" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
+    exp_name += "-trainning_set" + str(args.trainning_set) + "-model" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
+    exp_name += "-obs_dim" + str(args.obs_dim) + "-as" + str(args.action_scheme)
+    exp_name += "-auto_follow" + str(args.auto_follow) + "-burn_in" + str(args.burn_in)
     # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
-    exp_name += "-fs=" + str(args.num_stack)
-    exp_name += "-ts=" + str(args.target_scale) + "-ss=" + str(args.score_scale) + "-ap=" + str(args.ap)
-    exp_name += "dl=" + str(args.delay_len) + "clip=" + str(args.target_clip)
-    exp_name += "-lr=" + str(lr)
+    exp_name += "-fs" + str(args.num_stack)
+    exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
+    exp_name += "dl" + str(args.delay_len) + "clip" + str(args.target_clip)
+    exp_name += "-lr" + str(lr)
 
     mpi_fork(args.cpu, bind_to_core=False, cpu_set="")  # run parallel code with mpi
 
@@ -694,6 +697,6 @@ if __name__ == '__main__':
                            start_skip=start_skip,
                            duration=duration, burn_in=args.burn_in),
         actor_critic=actor_critic,
-        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr,
+        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr, ap=args.ap,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name)
