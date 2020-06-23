@@ -660,7 +660,7 @@ if __name__ == '__main__':
     lr = 4e-5
 
     exp_name = args.exp_name
-    exp_name += "-trainning_set" + args.trainning_set + "-model" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
+    exp_name += "-trainning_set" + str(args.trainning_set) + "-model" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
     exp_name += "-obs_dim" + str(args.obs_dim) + "-as" + str(args.action_scheme)
     exp_name += "-auto_follow" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
     # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)

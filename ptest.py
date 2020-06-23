@@ -11,7 +11,7 @@ import os
 os.environ['CUDA_VISIBLE_DEVICES'] = ""
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--num_cpu', type=int, default=2)
+parser.add_argument('--num_cpu', type=int, default=62)
 parser.add_argument('--num_stack', type=int, default=1)
 parser.add_argument('--test_days', type=int, default=62)
 parser.add_argument('--actions', type=int, default=15)
@@ -70,3 +70,5 @@ logger.log_tabular('Target_bias_per_step', with_min_and_max=True)
 logger.log_tabular('ApNum_per_step', average_only=True)
 logger.log_tabular('EpLen', average_only=True)
 logger.dump_tabular()
+
+os._exit(8)
