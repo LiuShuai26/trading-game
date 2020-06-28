@@ -18,14 +18,22 @@ os.environ['CUDA_VISIBLE_DEVICES'] = ""
 
 class DataV:
     def __init__(self, mode="game", csv_path="/home/shuai/day1-baseline_policy_au.csv"):
-        self.step = deque(maxlen=100)
-        self.last_price = deque(maxlen=100)
-        self.target = deque(maxlen=100)
-        self.actual_target = deque(maxlen=100)
-        self.action = deque(maxlen=100)
-        self.bid = deque(maxlen=100)
-        self.ask = deque(maxlen=100)
-        self.target_punish = deque(maxlen=100)
+        # self.step = deque(maxlen=100)
+        # self.last_price = deque(maxlen=100)
+        # self.target = deque(maxlen=100)
+        # self.actual_target = deque(maxlen=100)
+        # self.action = deque(maxlen=100)
+        # self.bid = deque(maxlen=100)
+        # self.ask = deque(maxlen=100)
+        # self.target_punish = deque(maxlen=100)
+        self.step = []
+        self.last_price = []
+        self.target = []
+        self.actual_target = []
+        self.action = []
+        self.bid = []
+        self.ask = []
+        self.target_punish = []
 
         self.mode = mode
         assert mode in ['game', 'csv'], "mode must be game or csv"
@@ -52,7 +60,7 @@ class DataV:
 
     def load_model(self):
         fpath = "/home/shuai/trading-game/spinningup/data/"
-        model = 'tf1_save174.960'
+        model = 'tf1_save190.080'
         fname = osp.join(fpath, model)
 
         print('\n\nLoading from %s.\n\n ' % fname)
@@ -68,27 +76,28 @@ class DataV:
 
     # This function is called periodically from FuncAnimation
     def animate(self, i):
+
         if self.mode is 'game':
             self.append_game_data(i)
         else:
             self.append_csv_data(i)
 
         self.axes[0][0].clear()
-        self.axes[0][0].plot(self.step, self.last_price)
-        self.axes[0][0].scatter(self.step, self.last_price, c=self.ask, cmap="Greens", s=60)
-        self.axes[0][0].scatter(self.step, self.last_price, c=self.bid, cmap="Reds", s=30)
+        self.axes[0][0].plot(self.step[-100:], self.last_price[-100:])
+        self.axes[0][0].scatter(self.step[-100:], self.last_price[-100:], c=self.ask[-100:], cmap="Greens", s=60)
+        self.axes[0][0].scatter(self.step[-100:], self.last_price[-100:], c=self.bid[-100:], cmap="Reds", s=30)
 
         self.axes[1][0].clear()
-        self.axes[1][0].plot(self.step, self.target)
-        self.axes[1][0].plot(self.step, self.actual_target)
-        self.axes[1][0].scatter(self.step, np.array(self.target) + np.array(self.target_punish), marker="s", c='red', s=10)
-        self.axes[1][0].scatter(self.step, np.array(self.target) - np.array(self.target_punish), marker="s", c='red', s=10)
+        self.axes[1][0].plot(self.step[-100:], self.target[-100:])
+        self.axes[1][0].plot(self.step[-100:], self.actual_target[-100:])
+        self.axes[1][0].scatter(self.step[-100:], np.array(self.target[-100:]) + np.array(self.target_punish[-100:]), marker="s", c='red', s=10)
+        self.axes[1][0].scatter(self.step[-100:], np.array(self.target[-100:]) - np.array(self.target_punish[-100:]), marker="s", c='red', s=10)
 
         # for i in range(self.target_punish)
 
         self.axes[0][1].clear()
-        self.axes[0][1].scatter(self.step, self.action, c=self.ask, cmap="Greens", s=60)
-        self.axes[0][1].scatter(self.step, self.action, c=self.bid, cmap="Reds", s=30)
+        self.axes[0][1].scatter(self.step[-100:], self.action[-100:], c=self.ask[-100:], cmap="Greens", s=60)
+        self.axes[0][1].scatter(self.step[-100:], self.action[-100:], c=self.bid[-100:], cmap="Reds", s=30)
 
     def append_game_data(self, i):
         if i == 0:
@@ -130,14 +139,54 @@ class DataV:
             self.ask.append(0)
             self.bid.append(0)
 
-    def show(self):
+    def animation_show(self):
+
+        ani_running = True
+
+        def onClick(event):
+            nonlocal ani_running
+            if ani_running:
+                ani.event_source.stop()
+                ani_running = False
+            else:
+                ani.event_source.start()
+                ani_running = True
+
+        self.fig.canvas.mpl_connect('button_press_event', onClick)
 
         # Set up plot to call animate() function periodically
         ani = animation.FuncAnimation(self.fig, self.animate, interval=1)
+        ani.event_source.stop()
+        plt.show()
+
+    def show(self):
+        for i in range(1000):
+            self.append_game_data(i)
+        self.axes[0][0].plot(self.step, self.last_price)
+        self.axes[0][0].scatter(self.step, self.last_price, c=self.ask, cmap="Greens", s=60)
+        self.axes[0][0].scatter(self.step, self.last_price, c=self.bid, cmap="Reds", s=30)
+
+        self.axes[1][0].plot(self.step, self.target)
+        self.axes[1][0].plot(self.step, self.actual_target)
+        self.axes[1][0].scatter(self.step,
+                                np.array(self.target) + np.array(self.target_punish), marker="s",
+                                c='red', s=10)
+        self.axes[1][0].scatter(self.step,
+                                np.array(self.target) - np.array(self.target_punish), marker="s",
+                                c='red', s=10)
+
+        self.axes[0][1].scatter(self.step, self.action, c=self.ask, cmap="Greens", s=60)
+        self.axes[0][1].scatter(self.step, self.action, c=self.bid, cmap="Reds", s=30)
         plt.show()
 
 
 if __name__ == '__main__':
-    testv = DataV(mode='game')
-    # testv = DataV(mode='csv')
-    testv.show()
+    mode = 'game'   # 'game' or 'csv'
+    animate = True
+
+    testv = DataV(mode=mode)
+    if animate:
+        testv.animation_show()
+    else:
+        testv.show()
+    os._exit(8)
