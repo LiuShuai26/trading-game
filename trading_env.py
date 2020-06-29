@@ -32,13 +32,15 @@ data_len = [
     225015, 225015, 225017, 225017, 225016, 225017, 225015, 225013, 225015, 225015, 225017, 225017, 225014, 225017,
     225015, 225013, 225015, 225017, 225015, 225015, 225015, 225017, 225015, 225017, 225017, 225015, 225015, 225015,
     225017, 225017, 225015, 225015, 225017, 225015, 225015, 225017, 225015, 225015, 225014, 225015, 225015, 225015,
-    225015, 225015, 225017, 225017, 225015, 225015
-]   # 90days
+    225015, 225015, 225017, 225017, 225015, 225015, 225015, 225015, 225017, 225015, 225017, 225015, 225015, 225015,
+    225015, 99005, 225015, 225017, 99009, 225015, 225015, 225009, 225017, 225015, 225015, 225015, 225013, 225013,
+    225015, 225015, 225013, 225015, 225015, 225017, 225015, 126016
+]  # 120days
 
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, action_scheme_id=21, auto_follow=0, obs_dim=38, render=False, max_ep_len=3000, trainning_set=54):
+    def __init__(self, action_scheme_id=21, auto_follow=0, obs_dim=38, render=False, max_ep_len=3000, trainning_set=90):
         super(TradingEnv, self).__init__()
 
         so_file = "./game.so"
@@ -73,7 +75,7 @@ class TradingEnv(gym.Env):
         # random start_day if no start_day
         if start_day is None:
             num_days = len(data_len)
-            start_day = np.random.randint(num_days-self.trainning_set+1, num_days+1, 1)[0]   # default: test[1-8] train[9-62]
+            start_day = np.random.randint(1, self.trainning_set + 1, 1)[0]  # default: test[1-8] train[9-62]
         # random start_skip if no start_skip
         day_index = start_day - 1
         max_point = data_len[day_index] - self.max_ep_len - burn_in
@@ -286,13 +288,14 @@ class FrameStack(gym.Wrapper):
         self.frame_stack = frame_stack
         self.jump = jump
         self.model = model
-        self.total_frame = frame_stack*jump
+        self.total_frame = frame_stack * jump
         self.frames = deque([], maxlen=self.total_frame)
         if model == 'mlp':
             self.obs_dim = self.env.observation_space.shape[0] * frame_stack
             self.observation_space = Box(-np.inf, np.inf, shape=(self.obs_dim,), dtype=np.float32)
         else:
-            self.observation_space = Box(-np.inf, np.inf, shape=(frame_stack, self.env.observation_space.shape[0]), dtype=np.float32)
+            self.observation_space = Box(-np.inf, np.inf, shape=(frame_stack, self.env.observation_space.shape[0]),
+                                         dtype=np.float32)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         ob = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)

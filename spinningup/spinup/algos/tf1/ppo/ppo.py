@@ -373,7 +373,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
-        for start_day in range(proc_id() + 1, 8 + 1, 8):
+        for start_day in range(proc_id() + 91, 8 + 91, 8):
             o, r, d, test_ret, test_len = env.reset(start_day=start_day, start_skip=0, duration=None,
                                                     burn_in=0), 0, False, 0, 0
             test_target_bias, test_reward_target_bias, test_reward_score, test_reward_apnum = 0, 0, 0, 0
@@ -630,7 +630,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='Trading')
-    parser.add_argument('--trainning_set', type=int, default=54)
+    parser.add_argument('--trainning_set', type=int, default=90)
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
