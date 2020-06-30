@@ -93,15 +93,25 @@ class DataV:
         self.axes[1][0].scatter(self.step[-100:], np.array(self.target[-100:]) + np.array(self.target_punish[-100:]), marker="s", c='red', s=10)
         self.axes[1][0].scatter(self.step[-100:], np.array(self.target[-100:]) - np.array(self.target_punish[-100:]), marker="s", c='red', s=10)
 
-        # for i in range(self.target_punish)
-
         self.axes[0][1].clear()
         self.axes[0][1].scatter(self.step[-100:], self.action[-100:], c=self.ask[-100:], cmap="Greens", s=60)
         self.axes[0][1].scatter(self.step[-100:], self.action[-100:], c=self.bid[-100:], cmap="Reds", s=30)
 
+        # self.axes[1][1].clear()
+        # self.axes[1][1].scatter(self.step[-100:], self.delay_action[-100:], cmap="Greens", s=60)
+        # self.axes[1][1].scatter(self.step[-100:], self.delay_action[-100:], cmap="Reds", s=30)
+
     def append_game_data(self, i):
         if i == 0:
-            self.o = self.env.reset(start_day=1, start_skip=0)
+            self.o = self.env.reset(start_day=10, start_skip=0)
+
+        delay_a = 0
+        if abs(self.env.raw_obs[26] - self.env.raw_obs[27]) > 5:
+            if self.env.raw_obs[26] > self.env.raw_obs[27]:
+                delay_a = 6
+            else:
+                delay_a = 9
+
         a = self.get_action(self.o)
         self.o, r, d, info = self.env.step(a)
 

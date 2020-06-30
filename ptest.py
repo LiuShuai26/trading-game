@@ -11,20 +11,22 @@ import os
 os.environ['CUDA_VISIBLE_DEVICES'] = ""
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--num_cpu', type=int, default=62)
+parser.add_argument('--num_cpu', type=int, default=30)
 parser.add_argument('--num_stack', type=int, default=1)
-parser.add_argument('--test_days', type=int, default=62)
+parser.add_argument('--test_days', type=int, default=30)
 parser.add_argument('--actions', type=int, default=15)
 parser.add_argument('--obs_dim', type=int, default=26)
-parser.add_argument('--exp_name', type=str, default='/spinningup/data/')
+parser.add_argument('--exp_name', type=str, default=None)
 parser.add_argument('--model', type=str, default='tf1_save190.080')
 args = parser.parse_args()
 
 assert args.num_cpu < 63, "num_cpu should < 63"
 mpi_fork(args.num_cpu)  # run parallel code with mpi
 
-# fpath = "/home/shuai/trading-game/spinningup/data/" + args.exp_name + '/' + args.exp_name + '_s0/'
-fpath = "/home/shuai/trading-game/spinningup/data/"
+if args.exp_name is not None:
+    fpath = "/home/shuai/trading-game/spinningup/data/" + args.exp_name + '/' + args.exp_name + '_s0/'
+else:
+    fpath = "/home/shuai/trading-game/spinningup/data/"
 fname = osp.join(fpath, args.model)
 
 print('\n\nLoading from %s.\n\n ' % fname)
@@ -48,7 +50,7 @@ if args.num_stack > 1:
     env = FrameStack(env, args.num_stack)
 # env = EnvWrapper(env)
 
-for start in range(proc_id() + 1, args.test_days + 1, args.num_cpu):
+for start in range(proc_id() + 91, args.test_days + 91, args.num_cpu):
     o, r, d, ep_ret, ep_len = env.reset(start_day=start, start_skip=0), 0, False, 0, 0
     ep_target_bias, ep_apnum = 0, 0
     while True:
