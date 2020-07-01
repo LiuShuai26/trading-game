@@ -11,7 +11,7 @@ import pandas as pd
 import pickle
 import time
 
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+"/rl_game/game/")
+os.chdir(os.path.dirname(os.path.abspath(__file__))+"/rl_game/game/")
 
 info_names = [
     "Done", "LastPrice", "BidPrice1", "BidVolume1", "AskPrice1", "AskVolume1", "BidPrice2", "BidVolume2",
