@@ -11,9 +11,7 @@ import pandas as pd
 import pickle
 import time
 
-expso = "/home/shuai/trading-game/rl_game/game/"
-
-os.chdir(expso)
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+"/rl_game/game/")
 
 info_names = [
     "Done", "LastPrice", "BidPrice1", "BidVolume1", "AskPrice1", "AskVolume1", "BidPrice2", "BidVolume2",
@@ -64,9 +62,6 @@ class TradingEnv(gym.Env):
         self.render = render
 
         self.trainning_set = trainning_set
-
-        with open("/home/shuai/trading-game/data_scaler.pkl", 'rb') as file:
-            self.scaler = pickle.load(file)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         # set random seed every time

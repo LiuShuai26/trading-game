@@ -2,8 +2,10 @@ import numpy as np
 import tensorflow as tf
 import time
 import sys
+import os
 
-sys.path.append("/home/shuai/trading-game/spinningup/")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(sys.path[0])))))
+sys.path.append(ROOT+'/spinningup')
 import spinup.algos.tf1.ppo.core as core
 from spinup.utils.logx import EpochLogger
 from spinup.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
@@ -86,7 +88,7 @@ class PPOBuffer:
 
 
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
-        steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4,
+        steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, exp_name='exp', summary_dir="/home/shuai/tb"):
     """
@@ -233,6 +235,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         KL = tf.Variable(0.)
         ClipFrac = tf.Variable(0.)
         lr = tf.Variable(0.)
+        ap = tf.Variable(0.)
 
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
@@ -269,6 +272,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("KL", KL))
         summaries.append(tf.summary.scalar("ClipFrac", ClipFrac))
         summaries.append(tf.summary.scalar("lr", lr))
+        summaries.append(tf.summary.scalar("ap", ap))
 
         test_summaries = []
 
@@ -293,7 +297,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                            EpScore]
         train_data_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
                             Action10, Action11, Action12, Action13, Action14, Action15, Action16]
-        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr]
+        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr, ap]
 
         test_data_ops = tf.summary.merge(test_summaries)
         test_data_vars = [TestRet, TestRet_target_bias, TestRet_score, TestRet_ap, TestTarget_bias,
@@ -369,7 +373,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.store(LossPi=pi_l_old, LossV=v_l_old,
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(pi_l_new - pi_l_old),
-                     DeltaLossV=(v_l_new - v_l_old), lr=decay_learning_rate)
+                     DeltaLossV=(v_l_new - v_l_old), lr=decay_learning_rate, ap=decay_ap)
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
@@ -400,14 +404,16 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     print("Day", start_day, "Len:", test_len, "Profit:", info["profit"], "Score:", info["score"])
                     break
         # after test we need reset the env
-        o, ep_ret, ep_len = env.reset(), 0, 0
+        o, ep_ret, ep_len = env.reset(ap=decay_ap), 0, 0
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+    o, r, d, ep_ret, ep_len = env.reset(ap=ap), 0, False, 0, 0
     ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
     min_score = 150
     max_saved_steps = 0
+
+    decay_ap = ap
 
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
@@ -468,10 +474,12 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  Action16=env.act_sta[16],
                                  )
 
-                o, ep_ret, ep_len = env.reset(), 0, 0
+                o, ep_ret, ep_len = env.reset(ap=decay_ap), 0, 0
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
         total_steps = (epoch + 1) * steps_per_epoch
+
+        decay_ap = ap * (0.96 ** (epoch // 35))
 
         # Perform PPO update!
         update(epoch)
@@ -512,6 +520,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_kl = logger.get_stats('KL')[0]
         tb_clipfrac = logger.get_stats('ClipFrac')[0]
         tb_lr = logger.get_stats('lr')[0]
+        tb_ap = logger.get_stats('ap')[0]
 
         if proc_id() == 0:
             summary_str = sess.run(train_data_ops, feed_dict={
@@ -548,6 +557,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 train_data_vars[30]: tb_kl,
                 train_data_vars[31]: tb_clipfrac,
                 train_data_vars[32]: tb_lr,
+                train_data_vars[33]: tb_ap,
             })
             writer.add_summary(summary_str, total_steps)
             writer.flush()
@@ -572,6 +582,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('KL', average_only=True)
         logger.log_tabular('ClipFrac', average_only=True)
         logger.log_tabular('lr', average_only=True)
+        logger.log_tabular('ap', average_only=True)
         logger.log_tabular('StopIter', average_only=True)
         logger.log_tabular('Time', time.time() - start_time)
         logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch) / (time.time() - start_time))
@@ -675,7 +686,7 @@ if __name__ == '__main__':
 
     logger_kwargs = setup_logger_kwargs(exp_name, args.seed)
 
-    sys.path.append("/home/shuai/trading-game")
+    sys.path.append(ROOT)
     from trading_env import TradingEnv, FrameStack
     from wrapper import EnvWrapper
 
@@ -694,6 +705,6 @@ if __name__ == '__main__':
                            start_skip=start_skip,
                            duration=duration, burn_in=args.burn_in),
         actor_critic=actor_critic,
-        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr,
+        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr, ap=args.ap,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name)
