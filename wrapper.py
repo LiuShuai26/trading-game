@@ -43,7 +43,7 @@ class EnvWrapper(gym.Wrapper):
         self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-    def reset(self, ap, start_day=None, start_skip=None, duration=None, burn_in=0):
+    def reset(self, ap=0.4, start_day=None, start_skip=None, duration=None, burn_in=0):
 
         self.ap = ap
         self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
