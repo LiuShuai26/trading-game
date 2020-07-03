@@ -179,22 +179,33 @@ class TradingEnv(gym.Env):
         schemes = {}
 
         def scheme3(action):
-            assert 0 <= action <= 2 or action == 6 or action == 9, "action should be 0,1,2"
+            assert 0 <= action <= 2, "action should be 0,1,2"
             if action == 1:
                 self.expso.Action(self.ctx, self.actions[18])  # 如果是买动作，卖方向全撤。
-                self.expso.Action(self.ctx, self.actions[6])
+                self.expso.Action(self.ctx, self.actions[5])
             elif action == 2:
                 self.expso.Action(self.ctx, self.actions[15])  # 如果是卖动作，买方向全撤。
-                self.expso.Action(self.ctx, self.actions[9])
-            elif action == 0:
+                self.expso.Action(self.ctx, self.actions[10])
+            else:
                 self.expso.Action(self.ctx, self.actions[action])
-            # for auto_clip
-            elif action == 6:
-                self.expso.Action(self.ctx, self.actions[18])
-                self.expso.Action(self.ctx, self.actions[6])
-            elif action == 9:
-                self.expso.Action(self.ctx, self.actions[15])
-                self.expso.Action(self.ctx, self.actions[9])
+
+        # def scheme3(action):
+        #     assert 0 <= action <= 2 or action == 6 or action == 9, "action should be 0,1,2"
+        #     if action == 1:
+        #         self.expso.Action(self.ctx, self.actions[18])  # 如果是买动作，卖方向全撤。
+        #         self.expso.Action(self.ctx, self.actions[6])
+        #     elif action == 2:
+        #         self.expso.Action(self.ctx, self.actions[15])  # 如果是卖动作，买方向全撤。
+        #         self.expso.Action(self.ctx, self.actions[9])
+        #     elif action == 0:
+        #         self.expso.Action(self.ctx, self.actions[action])
+        #     # for auto_clip
+        #     elif action == 6:
+        #         self.expso.Action(self.ctx, self.actions[18])
+        #         self.expso.Action(self.ctx, self.actions[6])
+        #     elif action == 9:
+        #         self.expso.Action(self.ctx, self.actions[15])
+        #         self.expso.Action(self.ctx, self.actions[9])
 
         schemes[3] = scheme3
 
