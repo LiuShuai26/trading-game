@@ -651,9 +651,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             # save model if lower than the min_score. min_score start from 150.
             if test_score < min_score:
                 min_score = test_score
-                save_path = saver.save(sess, logger_kwargs['output_dir'] + '/tf1_save' + str(min_score) + '/model.ckpt')
+                subfolder = '/tf1_save' + str(total_steps//1e6) + 'M' + str(min_score) + 'p'
+                save_path = saver.save(sess, logger_kwargs['output_dir'] + subfolder + '/model.ckpt')
                 decayp = {'decay_ap': decay_ap, 'decay_learning_rate': decay_learning_rate}
-                with open(logger_kwargs['output_dir'] + '/tf1_save' + str(min_score) + "/decayp.pickle", "wb") as pickle_out:
+                with open(logger_kwargs['output_dir'] + subfolder + "/decayp.pickle", "wb") as pickle_out:
                     pickle.dump(decayp, pickle_out)
                 print("Model saved in path: %s" % save_path)
 
