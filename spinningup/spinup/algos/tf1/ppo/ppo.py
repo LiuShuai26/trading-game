@@ -3,9 +3,11 @@ import tensorflow as tf
 import time
 import sys
 import os
+import pickle
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(sys.path[0])))))
 sys.path.append(ROOT+'/spinningup')
+from spinup.user_config import DEFAULT_DATA_DIR
 import spinup.algos.tf1.ppo.core as core
 from spinup.utils.logx import EpochLogger
 from spinup.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
@@ -90,7 +92,8 @@ class PPOBuffer:
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
-        target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, exp_name='exp', summary_dir="/home/shuai/tb"):
+        target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, restore_model="tf1_save",
+        exp_name='exp', summary_dir="/home/shuai/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -338,8 +341,14 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # config.intra_op_parallelism_threads = 1
     sess = tf.Session(config=config)
     # sess = tf.Session()
-
     sess.run(tf.global_variables_initializer())
+
+    # restore
+    saver = tf.train.Saver()
+    if restore_model:
+        saver.restore(sess, DEFAULT_DATA_DIR + '/' + restore_model + '/model.ckpt')
+        print("******", restore_model, "restored! ******")
+    # restore end
 
     # Sync params across processes
     sess.run(sync_all_params())
@@ -353,7 +362,6 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     def update(epoch):
         inputs = {k: v for k, v in zip(all_phs[:-1], buf.get())}
 
-        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
         inputs[all_phs[-1]] = decay_learning_rate
         pi_l_old, v_l_old, ent = sess.run([pi_loss, v_loss, approx_ent], feed_dict=inputs)
 
@@ -413,6 +421,13 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     min_score = 150
     max_saved_steps = 0
 
+    if restore_model:
+        with open(DEFAULT_DATA_DIR + '/' + restore_model + '/decayp.pickle', "rb") as pickle_in:
+            decayp = pickle.load(pickle_in)
+            print("****** decay parameters restored! ******")
+            ap = decayp['decay_ap']
+            lr = decayp['decay_learning_rate']
+            print(ap, lr)
     decay_ap = ap
 
     # Main loop: collect experience in env and update/log each epoch
@@ -480,6 +495,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         total_steps = (epoch + 1) * steps_per_epoch
 
         decay_ap = ap * (0.96 ** (epoch // 35))
+        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
 
         # Perform PPO update!
         update(epoch)
@@ -626,14 +642,20 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.dump_tabular()
 
             # save model every save_freq(25M) steps
-            if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
-                max_saved_steps = total_steps // save_freq
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
+            # if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
+            #     max_saved_steps = total_steps // save_freq
+            #     # logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
+            #     save_path = saver.save(sess, logger_kwargs['output_dir'] + '/checkpoints' + '/model' + str(max_saved_steps) + '.ckpt')
+            #     print("Model saved in path: %s" % save_path)
 
             # save model if lower than the min_score. min_score start from 150.
             if test_score < min_score:
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
                 min_score = test_score
+                save_path = saver.save(sess, logger_kwargs['output_dir'] + '/tf1_save' + str(min_score) + '/model.ckpt')
+                decayp = {'decay_ap': decay_ap, 'decay_learning_rate': decay_learning_rate}
+                with open(logger_kwargs['output_dir'] + '/tf1_save' + str(min_score) + "/decayp.pickle", "wb") as pickle_out:
+                    pickle.dump(decayp, pickle_out)
+                print("Model saved in path: %s" % save_path)
 
 
 if __name__ == '__main__':
@@ -661,6 +683,7 @@ if __name__ == '__main__':
     parser.add_argument('--obs_dim', type=int, default=26)
     parser.add_argument('--max_ep_len', type=int, default=3000)
     parser.add_argument('--exp_name', type=str, default='ppo')
+    parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
     assert args.model in ['mlp', 'cnn'], "model must be mlp or cnn"
@@ -679,6 +702,7 @@ if __name__ == '__main__':
     exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
     exp_name += "-lr" + str(lr)
+    exp_name += "-restore_model" + str(args.restore_model)
 
     mpi_fork(args.cpu, bind_to_core=False, cpu_set="")  # run parallel code with mpi
 
@@ -707,4 +731,6 @@ if __name__ == '__main__':
         actor_critic=actor_critic,
         ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr, ap=args.ap,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
-        logger_kwargs=logger_kwargs, exp_name=exp_name)
+        logger_kwargs=logger_kwargs, exp_name=exp_name, restore_model=args.restore_model)
+
+    os._exit(8)
