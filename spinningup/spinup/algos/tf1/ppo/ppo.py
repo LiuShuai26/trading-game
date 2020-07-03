@@ -618,6 +618,17 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             test_score = logger.get_stats('TestScore')[0]
 
             if proc_id() == 0:
+
+                # save model if lower than the min_score. min_score start from 150.
+                if test_score < min_score:
+                    min_score = test_score
+                    subfolder = '/tf1_save' + str(total_steps//1e6) + 'M' + str(min_score) + 'p'
+                    save_path = saver.save(sess, logger_kwargs['output_dir'] + subfolder + '/model.ckpt')
+                    decayp = {'decay_ap': decay_ap, 'decay_learning_rate': decay_learning_rate}
+                    with open(logger_kwargs['output_dir'] + subfolder + "/decayp.pickle", "wb") as pickle_out:
+                        pickle.dump(decayp, pickle_out)
+                    print("Model saved in path: %s" % save_path)
+
                 summary_str = sess.run(test_data_ops, feed_dict={
                     test_data_vars[0]: test_ep_ret,
                     test_data_vars[1]: test_ret_target_bias,
@@ -640,23 +651,6 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('TestScore', test_score)
             logger.log_tabular('TestLen', average_only=True)
             logger.dump_tabular()
-
-            # save model every save_freq(25M) steps
-            # if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
-            #     max_saved_steps = total_steps // save_freq
-            #     # logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
-            #     save_path = saver.save(sess, logger_kwargs['output_dir'] + '/checkpoints' + '/model' + str(max_saved_steps) + '.ckpt')
-            #     print("Model saved in path: %s" % save_path)
-
-            # save model if lower than the min_score. min_score start from 150.
-            if test_score < min_score:
-                min_score = test_score
-                subfolder = '/tf1_save' + str(total_steps//1e6) + 'M' + str(min_score) + 'p'
-                save_path = saver.save(sess, logger_kwargs['output_dir'] + subfolder + '/model.ckpt')
-                decayp = {'decay_ap': decay_ap, 'decay_learning_rate': decay_learning_rate}
-                with open(logger_kwargs['output_dir'] + subfolder + "/decayp.pickle", "wb") as pickle_out:
-                    pickle.dump(decayp, pickle_out)
-                print("Model saved in path: %s" % save_path)
 
 
 if __name__ == '__main__':
