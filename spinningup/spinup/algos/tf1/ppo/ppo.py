@@ -494,7 +494,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
         total_steps = (epoch + 1) * steps_per_epoch
 
-        decay_ap = ap * (0.96 ** (epoch // 35))
+        decay_ap = ap * (0.9 ** (epoch // 35))
         decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
 
         # Perform PPO update!
@@ -662,7 +662,6 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='Trading')
     parser.add_argument('--trainning_set', type=int, default=54)
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
@@ -682,7 +681,7 @@ if __name__ == '__main__':
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
     parser.add_argument('--max_ep_len', type=int, default=3000)
-    parser.add_argument('--exp_name', type=str, default='ppo')
+    parser.add_argument('--exp_name', type=str, default='NewHighLowPrice')
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
@@ -702,7 +701,8 @@ if __name__ == '__main__':
     exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
     exp_name += "-lr" + str(lr)
-    exp_name += "-restore_model" + str(args.restore_model)
+    if args.restore_model:
+        exp_name += "-restore_model" + str(args.restore_model)
 
     mpi_fork(args.cpu, bind_to_core=False, cpu_set="")  # run parallel code with mpi
 
