@@ -651,6 +651,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('TestScore', test_score)
             logger.log_tabular('TestLen', average_only=True)
             logger.dump_tabular()
+            logger.clear_epoch_dict()
 
 
 if __name__ == '__main__':
@@ -671,7 +672,7 @@ if __name__ == '__main__':
     parser.add_argument('--ap', type=float, default=0.4)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=5)
+    parser.add_argument('--target_clip', type=int, default=2)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
