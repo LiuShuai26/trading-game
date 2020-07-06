@@ -11,9 +11,7 @@ import pandas as pd
 import pickle
 import time
 
-expso = "/home/shuai/trading-game/rl_game/game/"
-
-os.chdir(expso)
+os.chdir(os.path.dirname(os.path.abspath(__file__))+"/rl_game/game/")
 
 info_names = [
     "Done", "LastPrice", "BidPrice1", "BidVolume1", "AskPrice1", "AskVolume1", "BidPrice2", "BidVolume2",
@@ -68,6 +66,8 @@ class TradingEnv(gym.Env):
         self.render = render
 
         self.trainning_set = trainning_set
+
+        self.his_price = deque(maxlen=30)
 
     def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
         # set random seed every time
@@ -134,6 +134,10 @@ class TradingEnv(gym.Env):
 
         if self.render and self.obs_dim == 38:
             self.rendering(action)
+
+        self.his_price.append(obs[0])
+        obs[22] = max(self.his_price)
+        obs[23] = min(self.his_price)
 
         return obs, reward, done, info
 

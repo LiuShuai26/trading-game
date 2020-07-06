@@ -2,8 +2,12 @@ import numpy as np
 import tensorflow as tf
 import time
 import sys
+import os
+import pickle
 
-sys.path.append("/home/shuai/trading-game/spinningup/")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(sys.path[0])))))
+sys.path.append(ROOT+'/spinningup')
+from spinup.user_config import DEFAULT_DATA_DIR
 import spinup.algos.tf1.ppo.core as core
 from spinup.utils.logx import EpochLogger
 from spinup.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
@@ -86,9 +90,10 @@ class PPOBuffer:
 
 
 def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
-        steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4,
+        steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
-        target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, exp_name='exp', summary_dir="/home/shuai/tb"):
+        target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, restore_model="tf1_save",
+        exp_name='exp', summary_dir="/home/shuai/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -233,6 +238,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         KL = tf.Variable(0.)
         ClipFrac = tf.Variable(0.)
         lr = tf.Variable(0.)
+        ap = tf.Variable(0.)
 
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
@@ -269,6 +275,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         summaries.append(tf.summary.scalar("KL", KL))
         summaries.append(tf.summary.scalar("ClipFrac", ClipFrac))
         summaries.append(tf.summary.scalar("lr", lr))
+        summaries.append(tf.summary.scalar("ap", ap))
 
         test_summaries = []
 
@@ -293,7 +300,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                            EpScore]
         train_data_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
                             Action10, Action11, Action12, Action13, Action14, Action15, Action16]
-        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr]
+        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr, ap]
 
         test_data_ops = tf.summary.merge(test_summaries)
         test_data_vars = [TestRet, TestRet_target_bias, TestRet_score, TestRet_ap, TestTarget_bias,
@@ -334,8 +341,14 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # config.intra_op_parallelism_threads = 1
     sess = tf.Session(config=config)
     # sess = tf.Session()
-
     sess.run(tf.global_variables_initializer())
+
+    # restore
+    saver = tf.train.Saver()
+    if restore_model:
+        saver.restore(sess, DEFAULT_DATA_DIR + '/' + restore_model + '/model.ckpt')
+        print("******", restore_model, "restored! ******")
+    # restore end
 
     # Sync params across processes
     sess.run(sync_all_params())
@@ -349,7 +362,6 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     def update(epoch):
         inputs = {k: v for k, v in zip(all_phs[:-1], buf.get())}
 
-        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
         inputs[all_phs[-1]] = decay_learning_rate
         pi_l_old, v_l_old, ent = sess.run([pi_loss, v_loss, approx_ent], feed_dict=inputs)
 
@@ -369,12 +381,12 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.store(LossPi=pi_l_old, LossV=v_l_old,
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(pi_l_new - pi_l_old),
-                     DeltaLossV=(v_l_new - v_l_old), lr=decay_learning_rate)
+                     DeltaLossV=(v_l_new - v_l_old), lr=decay_learning_rate, ap=decay_ap)
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
-        for start_day in range(proc_id() + 91, 8 + 91, 8):
-            o, r, d, test_ret, test_len = env.reset(start_day=start_day, start_skip=0, duration=None,
+        for start_day in range(proc_id() + 1, 8 + 1, 8):
+            o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day, start_skip=0, duration=None,
                                                     burn_in=0), 0, False, 0, 0
             test_target_bias, test_reward_target_bias, test_reward_score, test_reward_apnum = 0, 0, 0, 0
             while True:
@@ -400,14 +412,23 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     print("Day", start_day, "Len:", test_len, "Profit:", info["profit"], "Score:", info["score"])
                     break
         # after test we need reset the env
-        o, ep_ret, ep_len = env.reset(), 0, 0
+        o, ep_ret, ep_len = env.reset(ap=decay_ap), 0, 0
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+    o, r, d, ep_ret, ep_len = env.reset(ap=ap), 0, False, 0, 0
     ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
     min_score = 150
     max_saved_steps = 0
+
+    if restore_model:
+        with open(DEFAULT_DATA_DIR + '/' + restore_model + '/decayp.pickle', "rb") as pickle_in:
+            decayp = pickle.load(pickle_in)
+            print("****** decay parameters restored! ******")
+            ap = decayp['decay_ap']
+            lr = decayp['decay_learning_rate']
+            print(ap, lr)
+    decay_ap = ap
 
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
@@ -468,10 +489,13 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  Action16=env.act_sta[16],
                                  )
 
-                o, ep_ret, ep_len = env.reset(), 0, 0
+                o, ep_ret, ep_len = env.reset(ap=decay_ap), 0, 0
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
 
         total_steps = (epoch + 1) * steps_per_epoch
+
+        decay_ap = ap * (0.9 ** (epoch // 35))
+        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
 
         # Perform PPO update!
         update(epoch)
@@ -512,6 +536,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_kl = logger.get_stats('KL')[0]
         tb_clipfrac = logger.get_stats('ClipFrac')[0]
         tb_lr = logger.get_stats('lr')[0]
+        tb_ap = logger.get_stats('ap')[0]
 
         if proc_id() == 0:
             summary_str = sess.run(train_data_ops, feed_dict={
@@ -548,6 +573,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 train_data_vars[30]: tb_kl,
                 train_data_vars[31]: tb_clipfrac,
                 train_data_vars[32]: tb_lr,
+                train_data_vars[33]: tb_ap,
             })
             writer.add_summary(summary_str, total_steps)
             writer.flush()
@@ -572,6 +598,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('KL', average_only=True)
         logger.log_tabular('ClipFrac', average_only=True)
         logger.log_tabular('lr', average_only=True)
+        logger.log_tabular('ap', average_only=True)
         logger.log_tabular('StopIter', average_only=True)
         logger.log_tabular('Time', time.time() - start_time)
         logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch) / (time.time() - start_time))
@@ -591,6 +618,17 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             test_score = logger.get_stats('TestScore')[0]
 
             if proc_id() == 0:
+
+                # save model if lower than the min_score. min_score start from 150.
+                if test_score < min_score:
+                    min_score = test_score
+                    subfolder = '/tf1_save' + str(total_steps//1e6) + 'M' + str(min_score) + 'p'
+                    save_path = saver.save(sess, logger_kwargs['output_dir'] + subfolder + '/model.ckpt')
+                    decayp = {'decay_ap': decay_ap, 'decay_learning_rate': decay_learning_rate}
+                    with open(logger_kwargs['output_dir'] + subfolder + "/decayp.pickle", "wb") as pickle_out:
+                        pickle.dump(decayp, pickle_out)
+                    print("Model saved in path: %s" % save_path)
+
                 summary_str = sess.run(test_data_ops, feed_dict={
                     test_data_vars[0]: test_ep_ret,
                     test_data_vars[1]: test_ret_target_bias,
@@ -614,22 +652,11 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('TestLen', average_only=True)
             logger.dump_tabular()
 
-            # save model every save_freq(25M) steps
-            if (total_steps // save_freq > max_saved_steps) or (epoch == epochs - 1):
-                max_saved_steps = total_steps // save_freq
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
-
-            # save model if lower than the min_score. min_score start from 150.
-            if test_score < min_score:
-                logger.save_state({'env': env}, step=total_steps / 1e6, score=test_score)
-                min_score = test_score
-
 
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='Trading')
     parser.add_argument('--trainning_set', type=int, default=90)
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
@@ -649,7 +676,8 @@ if __name__ == '__main__':
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
     parser.add_argument('--max_ep_len', type=int, default=3000)
-    parser.add_argument('--exp_name', type=str, default='ppo')
+    parser.add_argument('--exp_name', type=str, default='NewHighLowPrice')
+    parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
     assert args.model in ['mlp', 'cnn'], "model must be mlp or cnn"
@@ -668,6 +696,8 @@ if __name__ == '__main__':
     exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
     exp_name += "-lr" + str(lr)
+    if args.restore_model:
+        exp_name += "-restore_model" + str(args.restore_model)
 
     mpi_fork(args.cpu, bind_to_core=False, cpu_set="")  # run parallel code with mpi
 
@@ -675,7 +705,7 @@ if __name__ == '__main__':
 
     logger_kwargs = setup_logger_kwargs(exp_name, args.seed)
 
-    sys.path.append("/home/shuai/trading-game")
+    sys.path.append(ROOT)
     from trading_env import TradingEnv, FrameStack
     from wrapper import EnvWrapper
 
@@ -694,6 +724,8 @@ if __name__ == '__main__':
                            start_skip=start_skip,
                            duration=duration, burn_in=args.burn_in),
         actor_critic=actor_critic,
-        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr,
+        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr, ap=args.ap,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
-        logger_kwargs=logger_kwargs, exp_name=exp_name)
+        logger_kwargs=logger_kwargs, exp_name=exp_name, restore_model=args.restore_model)
+
+    os._exit(8)

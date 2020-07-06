@@ -13,7 +13,7 @@ import tensorflow as tf
 import os.path as osp, time, atexit, os
 import warnings
 import sys
-sys.path.append("/home/shuai/trading-game/spinningup/")
+import os
 from spinup.utils.mpi_tools import proc_id, mpi_statistics_scalar
 from spinup.utils.serialization_utils import convert_json
 

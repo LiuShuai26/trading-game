@@ -2,7 +2,7 @@ import os.path as osp
 import tensorflow as tf
 import sys
 
-sys.path.append("/home/shuai/trading-game/spinningup/")
+sys.path.append(osp.abspath(osp.dirname(__file__))+"/spinningup/")
 from spinup.utils.logx import restore_tf_graph
 from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
 import argparse
