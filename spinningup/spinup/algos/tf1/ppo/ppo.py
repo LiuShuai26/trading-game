@@ -651,6 +651,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('TestScore', test_score)
             logger.log_tabular('TestLen', average_only=True)
             logger.dump_tabular()
+            logger.clear_epoch_dict()
 
 
 if __name__ == '__main__':
