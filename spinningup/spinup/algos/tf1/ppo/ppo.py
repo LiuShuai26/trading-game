@@ -93,7 +93,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, restore_model="tf1_save",
-        exp_name='exp', summary_dir="/home/shuai/tb"):
+        exp_name='exp', summary_dir=ROOT+"/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -484,6 +484,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
                 if d:
                     o = env.reset(ap=decay_ap)
+                env.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
+                        15: 0, 16: 0}
                 ep_ret, ep_len = 0, 0
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_ap = 0, 0, 0, 0, 0
 
@@ -599,6 +601,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch) / (time.time() - start_time))
         logger.log_tabular('ExpName', exp_name)
         logger.dump_tabular()
+        logger.clear_epoch_dict()
 
         # if True:          # for fast debug
         if (epoch + 1) % 15 == 0:
@@ -646,7 +649,6 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('TestScore', test_score)
             logger.log_tabular('TestLen', average_only=True)
             logger.dump_tabular()
-            logger.clear_epoch_dict()
 
 
 if __name__ == '__main__':
