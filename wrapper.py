@@ -99,10 +99,10 @@ class EnvWrapper(gym.Wrapper):
         info = {"TradingDay": self.raw_obs[25], "profit": profit,
                 "one_step_score": one_step_score,
                 "score": self.rewards[0],
-                "reward_score": reward_score,
+                "reward_score": -reward_score,
                 "target_bias": abs(target_bias),
-                "reward_target_bias": reward_target_bias,
-                "reward_ap_num": action_penalization,
+                "reward_target_bias": -reward_target_bias,
+                "reward_ap": -self.ap * action_penalization,
                 "ap": self.ap,
                 "target_total_tolerance": target_tolerance+self.target_clip,
                 }

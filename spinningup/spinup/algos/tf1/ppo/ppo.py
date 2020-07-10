@@ -335,12 +335,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     train_v = MpiAdamOptimizer(learning_rate=learning_rate).minimize(v_loss)
 
     config = tf.ConfigProto()
-    # config.gpu_options.per_process_gpu_memory_fraction = 0.05
     config.gpu_options.allow_growth = True
-    # config.inter_op_parallelism_threads = 1
-    # config.intra_op_parallelism_threads = 1
     sess = tf.Session(config=config)
-    # sess = tf.Session()
     sess.run(tf.global_variables_initializer())
 
     # restore
@@ -385,26 +381,26 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
-        for start_day in range(proc_id() + 1, 8 + 1, 8):
+        for start_day in range(proc_id() + 91, 8 + 91, 8):
             o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day, start_skip=0, duration=None,
                                                     burn_in=0), 0, False, 0, 0
-            test_target_bias, test_reward_target_bias, test_reward_score, test_reward_apnum = 0, 0, 0, 0
+            test_target_bias, test_reward_target_bias, test_reward_score, test_reward_ap = 0, 0, 0, 0
             while True:
                 a = get_action(o)
                 o, r, d, info = env.step(a)
                 test_ret += r
                 test_len += 1
-                test_target_bias += info["target_bias"]
                 test_reward_target_bias += info["reward_target_bias"]
                 test_reward_score += info["reward_score"]
-                test_reward_apnum += info["reward_ap_num"]
+                test_reward_ap += info["reward_ap"]
+                test_target_bias += info["target_bias"]
 
                 # if d or test_len == 3000:   # for fast debug
                 if d:
                     logger.store(AverageTestRet=test_ret,
                                  TestRet_target_bias=test_reward_target_bias,
                                  TestRet_score=test_reward_score,
-                                 TestRet_ap=test_reward_apnum,
+                                 TestRet_ap=test_reward_ap,
                                  TestTarget_bias=test_target_bias,
                                  TestTarget_bias_per_step=test_target_bias / test_len,
                                  TestScore=info["score"],
@@ -416,18 +412,16 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(ap=ap), 0, False, 0, 0
-    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
+    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_ap = 0, 0, 0, 0, 0
 
     min_score = 150
-    max_saved_steps = 0
 
     if restore_model:
         with open(DEFAULT_DATA_DIR + '/' + restore_model + '/decayp.pickle', "rb") as pickle_in:
             decayp = pickle.load(pickle_in)
-            print("****** decay parameters restored! ******")
             ap = decayp['decay_ap']
             lr = decayp['decay_learning_rate']
-            print(ap, lr)
+            print("****** decay parameters restored! lr:", lr, "ap:", ap, "******")
     decay_ap = ap
 
     # Main loop: collect experience in env and update/log each epoch
@@ -437,12 +431,12 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
             o2, r, d, info = env.step(a[0])
             ep_ret += r
-            ep_len += 1
-            ep_target_bias += info["target_bias"]
             ep_reward_target_bias += info["reward_target_bias"]
-            ep_score += info["one_step_score"]
             ep_reward_score += info["reward_score"]
-            ep_apnum += info["reward_ap_num"]
+            ep_reward_ap += info["reward_ap"]
+            ep_target_bias += info["target_bias"]
+            ep_score += info["one_step_score"]
+            ep_len += 1
 
             # save and log
             buf.store(o, a, r, v_t, logp_t)
@@ -463,10 +457,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     logger.store(AverageEpRet=ep_ret,
                                  EpRet_target_bias=ep_reward_target_bias,
                                  EpRet_score=ep_reward_score,
-                                 EpRet_ap=ep_apnum,
+                                 EpRet_ap=ep_reward_ap,
                                  EpTarget_bias=ep_target_bias,
                                  EpTarget_bias_per_step=ep_target_bias / ep_len,
-                                 # EpScore=ep_score,
                                  EpScore=info['score'],
                                  EpLen=ep_len)
 
@@ -489,13 +482,15 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  Action16=env.act_sta[16],
                                  )
 
-                o, ep_ret, ep_len = env.reset(ap=decay_ap), 0, 0
-                ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
+                if d:
+                    o = env.reset(ap=decay_ap)
+                ep_ret, ep_len = 0, 0
+                ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_ap = 0, 0, 0, 0, 0
 
         total_steps = (epoch + 1) * steps_per_epoch
 
         decay_ap = ap * (0.9 ** (epoch // 35))
-        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
+        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 3e-6)
 
         # Perform PPO update!
         update(epoch)
@@ -504,7 +499,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_ep_ret = logger.get_stats('AverageEpRet')[0]
         tb_ret_target_bias = logger.get_stats('EpRet_target_bias')[0]
         tb_ret_score = logger.get_stats('EpRet_score')[0]
-        tb_apnum = logger.get_stats('EpRet_ap')[0]
+        tb_ret_ap = logger.get_stats('EpRet_ap')[0]
         tb_target_bias = logger.get_stats('EpTarget_bias')[0]
         tb_target_bias_per_step = logger.get_stats('EpTarget_bias_per_step')[0]
         tb_score = logger.get_stats('EpScore')[0]
@@ -543,7 +538,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 train_data_vars[0]: tb_ep_ret,
                 train_data_vars[1]: tb_ret_target_bias,
                 train_data_vars[2]: tb_ret_score,
-                train_data_vars[3]: tb_apnum,
+                train_data_vars[3]: tb_ret_ap,
                 train_data_vars[4]: tb_target_bias,
                 train_data_vars[5]: tb_target_bias_per_step,
                 train_data_vars[6]: tb_score,
@@ -583,7 +578,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('AverageEpRet', tb_ep_ret)
         logger.log_tabular('EpRet_target_bias', tb_ret_target_bias)
         logger.log_tabular('EpRet_score', tb_ret_score)
-        logger.log_tabular('EpRet_ap', tb_apnum)
+        logger.log_tabular('EpRet_ap', tb_ret_ap)
         logger.log_tabular('EpTarget_bias', with_min_and_max=True)
         logger.log_tabular('EpTarget_bias_per_step', tb_target_bias_per_step)
         logger.log_tabular('EpScore', with_min_and_max=True)
@@ -612,7 +607,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
             test_ret_target_bias = logger.get_stats('TestRet_target_bias')[0]
             test_ret_score = logger.get_stats('TestRet_score')[0]
-            test_reward_apnum = logger.get_stats('TestRet_ap')[0]
+            test_ret_ap = logger.get_stats('TestRet_ap')[0]
             test_target_bias = logger.get_stats('TestTarget_bias')[0]
             test_target_bias_per_step = logger.get_stats('TestTarget_bias_per_step')[0]
             test_score = logger.get_stats('TestScore')[0]
@@ -633,7 +628,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     test_data_vars[0]: test_ep_ret,
                     test_data_vars[1]: test_ret_target_bias,
                     test_data_vars[2]: test_ret_score,
-                    test_data_vars[3]: test_reward_apnum,
+                    test_data_vars[3]: test_ret_ap,
                     test_data_vars[4]: test_target_bias,
                     test_data_vars[5]: test_target_bias_per_step,
                     test_data_vars[6]: test_score,
@@ -645,7 +640,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('AverageTestRet', test_ep_ret)
             logger.log_tabular('TestRet_target_bias', test_ret_target_bias)
             logger.log_tabular('TestRet_score', test_ret_score)
-            logger.log_tabular('TestRet_ap', test_reward_apnum)
+            logger.log_tabular('TestRet_ap', test_ret_ap)
             logger.log_tabular('TestTarget_bias', test_target_bias)
             logger.log_tabular('TestTarget_bias_per_step', test_target_bias_per_step)
             logger.log_tabular('TestScore', test_score)
@@ -661,22 +656,22 @@ if __name__ == '__main__':
     parser.add_argument('--trainning_set', type=int, default=90)
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
-    parser.add_argument('--gamma', type=float, default=0.998)
+    parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=8)
     parser.add_argument('--steps', type=int, default=72000)
     parser.add_argument('--epochs', type=int, default=3000000)
     parser.add_argument('--num_stack', type=int, default=1)
     parser.add_argument('--target_scale', type=float, default=1)
-    parser.add_argument('--score_scale', type=float, default=1.5)
+    parser.add_argument('--score_scale', type=float, default=1)
     parser.add_argument('--ap', type=float, default=0.4)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=2)
+    parser.add_argument('--target_clip', type=int, default=3)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
-    parser.add_argument('--max_ep_len', type=int, default=3000)
+    parser.add_argument('--max_ep_len', type=int, default=1000)
     parser.add_argument('--exp_name', type=str, default='NewHighLowPrice')
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
