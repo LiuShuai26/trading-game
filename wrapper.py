@@ -6,7 +6,7 @@ from gym.spaces import Box
 
 
 class EnvWrapper(gym.Wrapper):
-    def __init__(self, env, delay_len=30, target_clip=5, target_scale=1, score_scale=1.5, action_punish=0.5,
+    def __init__(self, env, delay_len=30, target_clip=5, target_scale=1, score_scale=1.5, profit_scale=1.5, action_punish=0.5,
                  start_day=None, start_skip=None, duration=None, burn_in=3000):
         super(EnvWrapper, self).__init__(env)
         # target
@@ -15,6 +15,10 @@ class EnvWrapper(gym.Wrapper):
         # reward
         self.target_scale = target_scale
         self.score_scale = score_scale
+        self.profit_scale = profit_scale
+        assert not (score_scale != 0 and profit_scale != 0), "score_scale and profit_scale must have one equal to 0"
+        if profit_scale != 0:
+            burn_in = 0
         self.ap = action_punish
         # env reset
         self.start_day = start_day
@@ -64,12 +68,18 @@ class EnvWrapper(gym.Wrapper):
         last_target = self.raw_obs[26]
         last_bias = self.raw_obs[26] - self.raw_obs[27]
         last_score = self.rewards[0]
+        last_profit = self.rewards[1]-self.rewards[3]
 
         obs, _, done, _ = self.env.step(action)
 
         profit = self.rewards[1]
+        baseline_profit = self.rewards[3]
         one_step_score = self.rewards[0] - last_score
+        one_step_profit = (self.rewards[1]-self.rewards[3] - last_profit) // 100
+
         reward_score = one_step_score * self.score_scale
+
+        reward_profit = one_step_profit * self.profit_scale
 
         target_now = self.raw_obs[26]
         actual_target = self.raw_obs[27]
@@ -92,18 +102,22 @@ class EnvWrapper(gym.Wrapper):
 
         action_penalization = 0 if action == 0 else 1
 
-        designed_reward = -(reward_target_bias + self.ap * action_penalization + reward_score)
+        designed_reward = -(reward_target_bias + action_penalization*self.ap + reward_score) + reward_profit
 
         self.act_sta[action] += 1
 
-        info = {"TradingDay": self.raw_obs[25], "profit": profit,
+        info = {"TradingDay": self.raw_obs[25],
                 "one_step_score": one_step_score,
+                "one_step_profit": one_step_profit,
+                "baseline_profit": baseline_profit,
                 "score": self.rewards[0],
-                "reward_score": -reward_score,
+                "profit": profit,
                 "target_bias": abs(target_bias),
-                "reward_target_bias": -reward_target_bias,
-                "reward_ap": -self.ap * action_penalization,
                 "ap": self.ap,
+                "reward_score": -reward_score,
+                "reward_profit": reward_profit,
+                "reward_target_bias": -reward_target_bias,
+                "reward_ap": -action_penalization*self.ap,
                 "target_total_tolerance": target_tolerance+self.target_clip,
                 }
 

@@ -390,10 +390,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 o, r, d, info = env.step(a)
                 test_ret += r
                 test_len += 1
+                test_target_bias += info["target_bias"]
                 test_reward_target_bias += info["reward_target_bias"]
                 test_reward_score += info["reward_score"]
                 test_reward_ap += info["reward_ap"]
-                test_target_bias += info["target_bias"]
 
                 # if d or test_len == 3000:   # for fast debug
                 if d:
@@ -412,7 +412,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(ap=ap), 0, False, 0, 0
-    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_ap = 0, 0, 0, 0, 0
+    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_profit, ep_reward_ap = 0, 0, 0, 0, 0, 0
 
     min_score = 150
 
@@ -431,12 +431,13 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
             o2, r, d, info = env.step(a[0])
             ep_ret += r
-            ep_reward_target_bias += info["reward_target_bias"]
-            ep_reward_score += info["reward_score"]
-            ep_reward_ap += info["reward_ap"]
-            ep_target_bias += info["target_bias"]
-            ep_score += info["one_step_score"]
             ep_len += 1
+            ep_target_bias += info["target_bias"]
+            ep_reward_target_bias += info["reward_target_bias"]
+            ep_score += info["one_step_score"]
+            ep_reward_score += info["reward_score"]
+            ep_reward_profit += info["reward_profit"]
+            ep_reward_ap += info["reward_ap"]
 
             # save and log
             buf.store(o, a, r, v_t, logp_t)
@@ -457,6 +458,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     logger.store(AverageEpRet=ep_ret,
                                  EpRet_target_bias=ep_reward_target_bias,
                                  EpRet_score=ep_reward_score,
+                                 EpRet_profit=ep_reward_profit,
                                  EpRet_ap=ep_reward_ap,
                                  EpTarget_bias=ep_target_bias,
                                  EpTarget_bias_per_step=ep_target_bias / ep_len,
@@ -482,10 +484,9 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  Action16=env.act_sta[16],
                                  )
 
-                if d:
-                    o = env.reset(ap=decay_ap)
-                env.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
-                        15: 0, 16: 0}
+                # if d:
+                o = env.reset(ap=decay_ap)
+                # env.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0}
                 ep_ret, ep_len = 0, 0
                 ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_ap = 0, 0, 0, 0, 0
 
@@ -604,7 +605,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.clear_epoch_dict()
 
         # if True:          # for fast debug
-        if (epoch + 1) % 15 == 0:
+        if (epoch + 1) % 15 == 0 and tb_target_bias_per_step < 10:
             test()
 
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
@@ -665,11 +666,12 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=3000000)
     parser.add_argument('--num_stack', type=int, default=1)
     parser.add_argument('--target_scale', type=float, default=1)
-    parser.add_argument('--score_scale', type=float, default=1)
+    parser.add_argument('--score_scale', type=float, default=1.5)
+    parser.add_argument('--profit_scale', type=float, default=0)
     parser.add_argument('--ap', type=float, default=0.4)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=3)
+    parser.add_argument('--target_clip', type=int, default=4)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
@@ -717,7 +719,8 @@ if __name__ == '__main__':
     else:
         actor_critic = core.cnn_actor_critic
 
-    ppo(lambda: EnvWrapper(env, delay_len=args.delay_len, target_scale=args.target_scale, score_scale=args.score_scale,
+    ppo(lambda: EnvWrapper(env, delay_len=args.delay_len,
+                           target_scale=args.target_scale, score_scale=args.score_scale, profit_scale=args.profit_scale,
                            action_punish=args.ap, target_clip=args.target_clip, start_day=start_day,
                            start_skip=start_skip,
                            duration=duration, burn_in=args.burn_in),
