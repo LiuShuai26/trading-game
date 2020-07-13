@@ -1,7 +1,8 @@
 import os.path as osp
 import tensorflow as tf
 import sys
-sys.path.append(sys.path[0]+'/spinningup')
+
+sys.path.append(sys.path[0] + '/spinningup')
 from spinup.utils.logx import restore_tf_graph
 from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
 import argparse
@@ -38,7 +39,11 @@ fpath = "/home/shuai/gameR12/trading-game/spinningup/data/"
 # get_action2 = lambda x: sess1.run(action_op2, feed_dict={model2['x']: x[None, :]})[0]
 
 
-model_names = ['tf1_save113.400', 'tf1_save136.080', 'tf1_save142.560', 'tf1_save190.080', 'tf1_save420.120']
+# model_names = ['tf1_save113.400', 'tf1_save136.080', 'tf1_save142.560',
+#                'tf1_save166.320', 'tf1_save169.560', 'tf1_save173.880', 'tf1_save190.080', 'tf1_save213.840',
+#                'tf1_save216.000', 'tf1_save420.120', 'tf1_save459.000', 'tf1_save87.480']
+model_names = ['tf1_save190.080', 'tf1_save166.320', 'tf1_save213.840', 'tf1_save420.120', 'tf1_save459.000']   # 'tf1_save136.080'
+
 
 models = []
 action_ops = []
@@ -47,7 +52,6 @@ get_actions = []
 sess = tf.Session()
 
 for i, model_name in enumerate(model_names):
-
     fname = osp.join(fpath, model_name)
     print('\n\nLoading from %s.\n\n ' % fname)
 
@@ -69,7 +73,7 @@ logger = EpochLogger()
 
 # env = EnvWrapper(env)
 
-for start in range(1, 62+1):
+for start in range(1, 62 + 1):
     o, r, d, ep_ret, ep_len = env.reset(start_day=start, start_skip=0), 0, False, 0, 0
     ep_target_bias, ep_apnum = 0, 0
     while True:

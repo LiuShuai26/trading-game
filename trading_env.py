@@ -251,7 +251,7 @@ class TradingEnv(gym.Env):
         return schemes[action_scheme_id]
 
     def baseline_policy(self, obs):  # actions: 0,6,9
-        obs = obs[-self.obs_ori_dim:]
+
         if obs[24] > obs[25]:
             action = 6
         elif obs[24] < obs[25]:

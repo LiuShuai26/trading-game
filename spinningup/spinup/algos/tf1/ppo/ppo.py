@@ -385,7 +385,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
-        for start_day in range(proc_id() + 1, 8 + 1, 8):
+        for start_day in range(proc_id() + 51, 8 + 51, 8):
             o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day, start_skip=0, duration=None,
                                                     burn_in=0), 0, False, 0, 0
             test_target_bias, test_reward_target_bias, test_reward_score, test_reward_apnum = 0, 0, 0, 0
@@ -416,7 +416,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(ap=ap), 0, False, 0, 0
-    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
+    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_profit, ep_ap = 0, 0, 0, 0, 0, 0
 
     min_score = 150
     max_saved_steps = 0
@@ -442,7 +442,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             ep_reward_target_bias += info["reward_target_bias"]
             ep_score += info["one_step_score"]
             ep_reward_score += info["reward_score"]
-            ep_apnum += info["reward_ap_num"]
+            ep_reward_profit += info["reward_profit"]
+            ep_ap += info["reward_ap"]
 
             # save and log
             buf.store(o, a, r, v_t, logp_t)
@@ -463,10 +464,10 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     logger.store(AverageEpRet=ep_ret,
                                  EpRet_target_bias=ep_reward_target_bias,
                                  EpRet_score=ep_reward_score,
-                                 EpRet_ap=ep_apnum,
+                                 EpRet_profit=ep_reward_profit,
+                                 EpRet_ap=ep_ap,
                                  EpTarget_bias=ep_target_bias,
                                  EpTarget_bias_per_step=ep_target_bias / ep_len,
-                                 # EpScore=ep_score,
                                  EpScore=info['score'],
                                  EpLen=ep_len)
 
@@ -490,7 +491,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  )
 
                 o, ep_ret, ep_len = env.reset(ap=decay_ap), 0, 0
-                ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_apnum = 0, 0, 0, 0, 0
+                ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_ap = 0, 0, 0, 0, 0
 
         total_steps = (epoch + 1) * steps_per_epoch
 
@@ -658,7 +659,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainning_set', type=int, default=54)
+    parser.add_argument('--trainning_set', type=int, default=50)
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
@@ -669,6 +670,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_stack', type=int, default=1)
     parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1.5)
+    parser.add_argument('--profit_scale', type=float, default=0)
     parser.add_argument('--ap', type=float, default=0.4)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
@@ -720,7 +722,8 @@ if __name__ == '__main__':
     else:
         actor_critic = core.cnn_actor_critic
 
-    ppo(lambda: EnvWrapper(env, delay_len=args.delay_len, target_scale=args.target_scale, score_scale=args.score_scale,
+    ppo(lambda: EnvWrapper(env, delay_len=args.delay_len,
+                           target_scale=args.target_scale, score_scale=args.score_scale, profit_scale=args.profit_scale,
                            action_punish=args.ap, target_clip=args.target_clip, start_day=start_day,
                            start_skip=start_skip,
                            duration=duration, burn_in=args.burn_in),
