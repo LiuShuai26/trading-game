@@ -93,7 +93,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, restore_model="tf1_save",
-        exp_name='exp', summary_dir="/home/shuai/tb"):
+        exp_name='exp', summary_dir=ROOT+"/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -335,12 +335,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     train_v = MpiAdamOptimizer(learning_rate=learning_rate).minimize(v_loss)
 
     config = tf.ConfigProto()
-    # config.gpu_options.per_process_gpu_memory_fraction = 0.05
     config.gpu_options.allow_growth = True
-    # config.inter_op_parallelism_threads = 1
-    # config.intra_op_parallelism_threads = 1
     sess = tf.Session(config=config)
-    # sess = tf.Session()
     sess.run(tf.global_variables_initializer())
 
     # restore
@@ -416,18 +412,16 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(ap=ap), 0, False, 0, 0
-    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_profit, ep_ap = 0, 0, 0, 0, 0, 0
+    ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_profit, ep_reward_ap = 0, 0, 0, 0, 0, 0
 
     min_score = 150
-    max_saved_steps = 0
 
     if restore_model:
         with open(DEFAULT_DATA_DIR + '/' + restore_model + '/decayp.pickle', "rb") as pickle_in:
             decayp = pickle.load(pickle_in)
-            print("****** decay parameters restored! ******")
             ap = decayp['decay_ap']
             lr = decayp['decay_learning_rate']
-            print(ap, lr)
+            print("****** decay parameters restored! lr:", lr, "ap:", ap, "******")
     decay_ap = ap
 
     # Main loop: collect experience in env and update/log each epoch
@@ -443,7 +437,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             ep_score += info["one_step_score"]
             ep_reward_score += info["reward_score"]
             ep_reward_profit += info["reward_profit"]
-            ep_ap += info["reward_ap"]
+            ep_reward_ap += info["reward_ap"]
 
             # save and log
             buf.store(o, a, r, v_t, logp_t)
@@ -465,7 +459,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  EpRet_target_bias=ep_reward_target_bias,
                                  EpRet_score=ep_reward_score,
                                  EpRet_profit=ep_reward_profit,
-                                 EpRet_ap=ep_ap,
+                                 EpRet_ap=ep_reward_ap,
                                  EpTarget_bias=ep_target_bias,
                                  EpTarget_bias_per_step=ep_target_bias / ep_len,
                                  EpScore=info['score'],
@@ -490,13 +484,16 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                  Action16=env.act_sta[16],
                                  )
 
-                o, ep_ret, ep_len = env.reset(ap=decay_ap), 0, 0
-                ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_ap = 0, 0, 0, 0, 0
+                # if d:
+                o = env.reset(ap=decay_ap)
+                # env.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0}
+                ep_ret, ep_len = 0, 0
+                ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_ap = 0, 0, 0, 0, 0
 
         total_steps = (epoch + 1) * steps_per_epoch
 
         decay_ap = ap * (0.9 ** (epoch // 35))
-        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 5e-6)
+        decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 3e-6)
 
         # Perform PPO update!
         update(epoch)
@@ -505,7 +502,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         tb_ep_ret = logger.get_stats('AverageEpRet')[0]
         tb_ret_target_bias = logger.get_stats('EpRet_target_bias')[0]
         tb_ret_score = logger.get_stats('EpRet_score')[0]
-        tb_apnum = logger.get_stats('EpRet_ap')[0]
+        tb_ret_ap = logger.get_stats('EpRet_ap')[0]
         tb_target_bias = logger.get_stats('EpTarget_bias')[0]
         tb_target_bias_per_step = logger.get_stats('EpTarget_bias_per_step')[0]
         tb_score = logger.get_stats('EpScore')[0]
@@ -544,7 +541,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 train_data_vars[0]: tb_ep_ret,
                 train_data_vars[1]: tb_ret_target_bias,
                 train_data_vars[2]: tb_ret_score,
-                train_data_vars[3]: tb_apnum,
+                train_data_vars[3]: tb_ret_ap,
                 train_data_vars[4]: tb_target_bias,
                 train_data_vars[5]: tb_target_bias_per_step,
                 train_data_vars[6]: tb_score,
@@ -584,7 +581,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('AverageEpRet', tb_ep_ret)
         logger.log_tabular('EpRet_target_bias', tb_ret_target_bias)
         logger.log_tabular('EpRet_score', tb_ret_score)
-        logger.log_tabular('EpRet_ap', tb_apnum)
+        logger.log_tabular('EpRet_ap', tb_ret_ap)
         logger.log_tabular('EpTarget_bias', with_min_and_max=True)
         logger.log_tabular('EpTarget_bias_per_step', tb_target_bias_per_step)
         logger.log_tabular('EpScore', with_min_and_max=True)
@@ -605,15 +602,16 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch) / (time.time() - start_time))
         logger.log_tabular('ExpName', exp_name)
         logger.dump_tabular()
+        logger.clear_epoch_dict()
 
         # if True:          # for fast debug
-        if (epoch + 1) % 15 == 0:
+        if (epoch + 1) % 15 == 0 and tb_target_bias_per_step < 10:
             test()
 
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
             test_ret_target_bias = logger.get_stats('TestRet_target_bias')[0]
             test_ret_score = logger.get_stats('TestRet_score')[0]
-            test_reward_ap = logger.get_stats('TestRet_ap')[0]
+            test_ret_ap = logger.get_stats('TestRet_ap')[0]
             test_target_bias = logger.get_stats('TestTarget_bias')[0]
             test_target_bias_per_step = logger.get_stats('TestTarget_bias_per_step')[0]
             test_score = logger.get_stats('TestScore')[0]
@@ -634,7 +632,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     test_data_vars[0]: test_ep_ret,
                     test_data_vars[1]: test_ret_target_bias,
                     test_data_vars[2]: test_ret_score,
-                    test_data_vars[3]: test_reward_ap,
+                    test_data_vars[3]: test_ret_ap,
                     test_data_vars[4]: test_target_bias,
                     test_data_vars[5]: test_target_bias_per_step,
                     test_data_vars[6]: test_score,
@@ -646,13 +644,12 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('AverageTestRet', test_ep_ret)
             logger.log_tabular('TestRet_target_bias', test_ret_target_bias)
             logger.log_tabular('TestRet_score', test_ret_score)
-            logger.log_tabular('TestRet_ap', test_reward_ap)
+            logger.log_tabular('TestRet_ap', test_ret_ap)
             logger.log_tabular('TestTarget_bias', test_target_bias)
             logger.log_tabular('TestTarget_bias_per_step', test_target_bias_per_step)
             logger.log_tabular('TestScore', test_score)
             logger.log_tabular('TestLen', average_only=True)
             logger.dump_tabular()
-            logger.clear_epoch_dict()
 
 
 if __name__ == '__main__':
