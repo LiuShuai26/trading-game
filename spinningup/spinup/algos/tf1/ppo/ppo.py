@@ -388,7 +388,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         for start_day in range(proc_id() + 51, 8 + 51, 8):
             o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day, start_skip=0, duration=None,
                                                     burn_in=0), 0, False, 0, 0
-            test_target_bias, test_reward_target_bias, test_reward_score, test_reward_apnum = 0, 0, 0, 0
+            test_target_bias, test_reward_target_bias, test_reward_score, test_reward_ap = 0, 0, 0, 0
             while True:
                 a = get_action(o)
                 o, r, d, info = env.step(a)
@@ -397,14 +397,14 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 test_target_bias += info["target_bias"]
                 test_reward_target_bias += info["reward_target_bias"]
                 test_reward_score += info["reward_score"]
-                test_reward_apnum += info["reward_ap_num"]
+                test_reward_ap += info["reward_ap"]
 
                 # if d or test_len == 3000:   # for fast debug
                 if d:
                     logger.store(AverageTestRet=test_ret,
                                  TestRet_target_bias=test_reward_target_bias,
                                  TestRet_score=test_reward_score,
-                                 TestRet_ap=test_reward_apnum,
+                                 TestRet_ap=test_reward_ap,
                                  TestTarget_bias=test_target_bias,
                                  TestTarget_bias_per_step=test_target_bias / test_len,
                                  TestScore=info["score"],
@@ -613,7 +613,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
             test_ret_target_bias = logger.get_stats('TestRet_target_bias')[0]
             test_ret_score = logger.get_stats('TestRet_score')[0]
-            test_reward_apnum = logger.get_stats('TestRet_ap')[0]
+            test_reward_ap = logger.get_stats('TestRet_ap')[0]
             test_target_bias = logger.get_stats('TestTarget_bias')[0]
             test_target_bias_per_step = logger.get_stats('TestTarget_bias_per_step')[0]
             test_score = logger.get_stats('TestScore')[0]
@@ -634,7 +634,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     test_data_vars[0]: test_ep_ret,
                     test_data_vars[1]: test_ret_target_bias,
                     test_data_vars[2]: test_ret_score,
-                    test_data_vars[3]: test_reward_apnum,
+                    test_data_vars[3]: test_reward_ap,
                     test_data_vars[4]: test_target_bias,
                     test_data_vars[5]: test_target_bias_per_step,
                     test_data_vars[6]: test_score,
@@ -646,7 +646,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('AverageTestRet', test_ep_ret)
             logger.log_tabular('TestRet_target_bias', test_ret_target_bias)
             logger.log_tabular('TestRet_score', test_ret_score)
-            logger.log_tabular('TestRet_ap', test_reward_apnum)
+            logger.log_tabular('TestRet_ap', test_reward_ap)
             logger.log_tabular('TestTarget_bias', test_target_bias)
             logger.log_tabular('TestTarget_bias_per_step', test_target_bias_per_step)
             logger.log_tabular('TestScore', test_score)
