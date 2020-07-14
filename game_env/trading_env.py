@@ -23,7 +23,15 @@ info_names = [
     "AliveAskVolume3", "score", "profit", "total_profit", "baseline_profit", "action", "designed_reward"
 ]
 
-data_len = [
+data_v12_len = [
+    225016, 225018, 225018, 225018, 225018, 225017, 225018, 225016, 225014, 225016, 225016, 225018, 225018, 225015,
+    225018, 225016, 177490, 225016, 225018, 225016, 225016, 225016, 225018, 225016, 225018, 225018, 225016, 225016,
+    225016, 225018, 225018, 225016, 225016, 225018, 225016, 225016, 225018, 225016, 225016, 225015, 225016, 225016,
+    225016, 225016, 192623, 225018, 225018, 225016, 225016, 225016, 225016, 225018, 225016, 225018, 225016, 225016,
+    225016, 225016, 99006, 225016, 225018, 99010
+]   # 62days
+
+data_v19_len = [
     225013, 225015, 225015, 225015, 225015, 225017, 225015, 225015, 225017, 225015, 225015, 225015, 225015, 225015,
     225015, 225015, 225015, 225015, 225015, 225015, 225015, 225015, 225010, 225015, 225015, 135002, 225015, 225015,
     225015, 225015, 225015, 225017, 225015, 225017, 225015, 225017, 225015, 225015, 225015, 225015, 225017, 225015,
@@ -33,13 +41,20 @@ data_len = [
     225015, 225015, 225017, 225017, 225015, 225015, 225015, 225015, 225017, 225015, 225017, 225015, 225015, 225015,
     225015, 99005, 225015, 225017, 99009, 225015, 225015, 225009, 225017, 225015, 225015, 225015, 225013, 225013,
     225015, 225015, 225013, 225015, 225015, 225017, 225015, 126016
-]  # 120days
+]   # 120days
 
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, action_scheme_id=21, auto_follow=0, obs_dim=38, render=False, max_ep_len=3000, trainning_set=90):
+    def __init__(self, data_v, action_scheme_id, auto_follow, obs_dim, max_ep_len, trainning_set, render=False):
         super(TradingEnv, self).__init__()
+
+        self.data_v = data_v
+
+        if self.data_v == "r19":
+            self.data_len = data_v19_len
+        else:
+            self.data_len = data_v12_len
 
         so_file = "./game.so"
         self.expso = ctypes.cdll.LoadLibrary(so_file)
@@ -69,27 +84,16 @@ class TradingEnv(gym.Env):
 
         self.his_price = deque(maxlen=30)
 
-    def reset(self, start_day=None, start_skip=None, duration=None, burn_in=0):
+    def reset(self, start_day=None, burn_in=0):
         # set random seed every time
         # np.random.seed()
         # random start_day if no start_day
         if start_day is None:
-            num_days = len(data_len)
-            start_day = np.random.randint(1, self.trainning_set + 1, 1)[0]  # default: test[1-8] train[9-62]
-        # random start_skip if no start_skip
+            start_day = np.random.randint(1, self.trainning_set + 1, 1)[0]  # first self.trainning_set days
+        # random start_skip
         day_index = start_day - 1
-        max_point = data_len[day_index] - self.max_ep_len - burn_in
-        if start_skip is None:
-            start_skip = int(np.random.randint(0, max_point, 1)[0])
-        elif duration is not None:
-            assert start_skip + duration < max_point, 'start_skip or end_skip is too large!'
-            start_skip = int(np.random.randint(start_skip, start_skip + duration, 1)[0])
-        else:
-            assert start_skip < max_point, 'start_skip is too large!'
-
-        # print("-------------env reset-------------")
-        # print('start_day:', start_day, 'start_skip:', start_skip, "duration:", duration, "max_point:", max_point, "dl:",
-        #       data_len[day_index], "burn_in:", burn_in, "ml:", self.max_ep_len)
+        max_point = self.data_len[day_index] - self.max_ep_len - burn_in
+        start_skip = int(np.random.randint(0, max_point, 1)[0])
 
         start_info = {"date_index": "{} - {}".format(start_day, start_day), "skip_steps": start_skip}
 
@@ -142,15 +146,27 @@ class TradingEnv(gym.Env):
         return obs, reward, done, info
 
     def _get_obs(self, raw_obs):
-        price_mean = 26440.28
-        price_max = 27952.0
-        bid_ask_volume_log_mean = 1.97
-        bid_ask_volume_log_max = 6.42
-        total_volume_mean = 120755.66
-        total_volume_max = 321988.0
-        # target_abs_mean = 51.018
-        target_mean = 2.55
-        target_max = 311.0
+        if self.data_v == "r19":
+            price_mean = 26440.28
+            price_max = 27952.0
+            bid_ask_volume_log_mean = 1.97
+            bid_ask_volume_log_max = 6.42
+            total_volume_mean = 120755.66
+            total_volume_max = 321988.0
+            # target_abs_mean = 51.018
+            target_mean = 2.55
+            target_max = 311.0
+        else:
+            price_mean = 26871.05
+            price_max = 28540.0
+            bid_ask_volume_log_mean = 2.05
+            bid_ask_volume_log_max = 6.43
+            total_volume_mean = 56871.13
+            total_volume_max = 175383.0
+            # target_abs_mean = 100.861
+            target_mean = 20.69
+            target_max = 485.0
+
         price_filter = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23, 24, 28, 30, 32, 36, 38, 40]
         bid_ask_volume_filter = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 29, 31, 33, 37, 39, 41]
         total_volume_filter = [22]

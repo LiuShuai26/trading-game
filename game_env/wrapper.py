@@ -7,7 +7,7 @@ from gym.spaces import Box
 
 class EnvWrapper(gym.Wrapper):
     def __init__(self, env, delay_len=30, target_clip=5, target_scale=1, score_scale=1.5, profit_scale=1.5, action_punish=0.5,
-                 start_day=None, start_skip=None, duration=None, burn_in=3000):
+                 burn_in=3000):
         super(EnvWrapper, self).__init__(env)
         # target
         self.target_diff = deque(maxlen=delay_len)  # target delay setting
@@ -21,9 +21,6 @@ class EnvWrapper(gym.Wrapper):
             burn_in = 0
         self.ap = action_punish
         # env reset
-        self.start_day = start_day
-        self.start_skip = start_skip
-        self.duration = duration
         self.burn_in = burn_in
         # statistic
         self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
@@ -47,19 +44,16 @@ class EnvWrapper(gym.Wrapper):
         self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-    def reset(self, ap=0.4, start_day=None, start_skip=None, duration=None, burn_in=0):
+    def reset(self, ap=0.4, start_day=None, burn_in=0):
 
         self.ap = ap
         self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
                         15: 0, 16: 0}
         if start_day is not None:
-            obs = self.env.reset(start_day=start_day, start_skip=start_skip, duration=duration, burn_in=burn_in)
+            obs = self.env.reset(start_day=start_day, burn_in=burn_in)
             self._env_skip(burn_in)
         else:
-            obs = self.env.reset(start_day=self.start_day,
-                                 start_skip=self.start_skip,
-                                 duration=self.duration,
-                                 burn_in=self.burn_in)
+            obs = self.env.reset(burn_in=self.burn_in)
             self._env_skip(self.burn_in)
         return obs
 

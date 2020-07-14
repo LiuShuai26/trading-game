@@ -85,12 +85,12 @@ class PPOBuffer:
         self.ptr, self.path_start_idx = 0, 0
         # the next two lines implement the advantage normalization trick
         adv_mean, adv_std = mpi_statistics_scalar(self.adv_buf)
-        self.adv_buf = (self.adv_buf - adv_mean) / adv_std
+        self.adv_buf = (self.adv_buf - adv_mean)# / adv_std
         return [self.obs_buf, self.act_buf, self.adv_buf,
                 self.ret_buf, self.logp_buf]
 
 
-def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
+def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, restore_model="tf1_save",
@@ -190,7 +190,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     adv_ph, ret_ph, logp_old_ph = core.placeholders(None, None, None)
 
     # Main outputs from computation graph
-    pi, logp, logp_pi, v = actor_critic(x_ph, a_ph, **ac_kwargs)
+    pi, logp, logp_pi, h, v = actor_critic(x_ph, a_ph, **ac_kwargs)
 
     learning_rate = tf.placeholder(tf.float32, shape=[])
 
@@ -198,7 +198,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     all_phs = [x_ph, a_ph, adv_ph, ret_ph, logp_old_ph, learning_rate]
 
     # Every step, get: action, value, and logprob
-    get_action_ops = [pi, v, logp_pi]
+    get_action_ops = [pi, v, logp_pi, h]
 
     # Tensorflow Summary Ops
     def build_summaries():
@@ -321,13 +321,22 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     # PPO objectives
     ratio = tf.exp(logp - logp_old_ph)  # pi(a|s) / pi_old(a|s)
-    min_adv = tf.where(adv_ph > 0, (1 + clip_ratio) * adv_ph, (1 - clip_ratio) * adv_ph)
-    pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_ph, min_adv))
+
+    # Scheme2: SPPO NO.2: add entropy
+    # min_adv = tf.where(adv_ph > 0, (1 + clip_ratio) * adv_ph, (1 - clip_ratio) * adv_ph)
+    # pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_ph, min_adv) + alpha * h)
+
+    # # Scheme3: SPPO NO.3: add entropy
+    adv_logp = adv_ph - alpha * logp_old_ph
+    min_adv = tf.where(adv_logp>0, (1+clip_ratio)*adv_logp, (1-clip_ratio)*adv_logp)
+    pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_logp, min_adv))
+
     v_loss = tf.reduce_mean((ret_ph - v) ** 2)
 
     # Info (useful to watch during learning)
     approx_kl = tf.reduce_mean(logp_old_ph - logp)  # a sample estimate for KL-divergence, easy to compute
-    approx_ent = tf.reduce_mean(-logp)  # a sample estimate for entropy, also easy to compute
+    # approx_ent = tf.reduce_mean(-logp)  # a sample estimate for entropy, also easy to compute
+    approx_ent = tf.reduce_mean(h)
     clipped = tf.logical_or(ratio > (1 + clip_ratio), ratio < (1 - clip_ratio))
     clipfrac = tf.reduce_mean(tf.cast(clipped, tf.float32))
 
@@ -382,9 +391,12 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
-        for start_day in range(proc_id() + 91, 8 + 91, 8):
-            o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day, start_skip=0, duration=None,
-                                                    burn_in=0), 0, False, 0, 0
+        if data_v == "r19":
+            start_test = 91
+        else:
+            start_test = 51
+        for start_day in range(proc_id() + start_test, 8 + start_test, 8):
+            o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day, burn_in=0), 0, False, 0, 0
             test_target_bias, test_reward_target_bias, test_reward_score, test_reward_ap = 0, 0, 0, 0
             while True:
                 a = get_action(o)
@@ -396,8 +408,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 test_reward_score += info["reward_score"]
                 test_reward_ap += info["reward_ap"]
 
-                # if d or test_len == 3000:   # for fast debug
-                if d:
+                if d or test_len == 3000:   # for fast debug
+                # if d:
                     logger.store(AverageTestRet=test_ret,
                                  TestRet_target_bias=test_reward_target_bias,
                                  TestRet_score=test_reward_score,
@@ -428,8 +440,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
         for t in range(local_steps_per_epoch):
-            a, v_t, logp_t = sess.run(get_action_ops, feed_dict={x_ph: o[np.newaxis, ...]})
-
+            a, v_t, logp_t, h_t = sess.run(get_action_ops, feed_dict={x_ph: o[np.newaxis, ...]})
+            rh = r + alpha * h_t
             o2, r, d, info = env.step(a[0])
             ep_ret += r
             ep_len += 1
@@ -441,7 +453,7 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             ep_reward_ap += info["reward_ap"]
 
             # save and log
-            buf.store(o, a, r, v_t, logp_t)
+            buf.store(o, a, rh, v_t, logp_t)
             logger.store(VVals=v_t)
 
             # Update obs (critical!)
@@ -605,8 +617,8 @@ def ppo(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         logger.dump_tabular()
         logger.clear_epoch_dict()
 
-        # if True:          # for fast debug
-        if (epoch + 1) % 15 == 0 and tb_target_bias_per_step < 10:
+        if True:          # for fast debug
+        # if (epoch + 1) % 15 == 0 and tb_target_bias_per_step < 10:
             test()
 
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
@@ -657,7 +669,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainning_set', type=int, default=90)
+    parser.add_argument('--data_v', type=str, default='r12')
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.99)
@@ -677,22 +689,24 @@ if __name__ == '__main__':
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
     parser.add_argument('--max_ep_len', type=int, default=1000)
-    parser.add_argument('--exp_name', type=str, default='NewHighLowPrice')
+    parser.add_argument('--exp_name', type=str, default='New')
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
     assert args.model in ['mlp', 'cnn'], "model must be mlp or cnn"
+    assert args.data_v in ['r12', 'r19'], "data version must be r12 or r19"
 
-    start_day = None
-    start_skip = None
-    duration = None
     lr = 4e-5
 
-    exp_name = args.exp_name
-    exp_name += "-trainning_set" + str(args.trainning_set) + "-model" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
+    if args.data_v == "r19":
+        trainning_set = 90
+    else:
+        trainning_set = 50
+
+    exp_name = args.exp_name + "-dataV-" + args.data_v
+    exp_name += "-trainning_set" + str(trainning_set) + "-model" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
     exp_name += "-obs_dim" + str(args.obs_dim) + "-as" + str(args.action_scheme)
     exp_name += "-auto_follow" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
-    # exp_name += "dataset=" + str(start_day) + '-start_skip' + str(start_skip) + '-duration' + str(duration)
     exp_name += "-fs" + str(args.num_stack)
     exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
@@ -709,8 +723,8 @@ if __name__ == '__main__':
     from game_env.trading_env import TradingEnv, FrameStack
     from game_env.wrapper import EnvWrapper
 
-    env = TradingEnv(action_scheme_id=args.action_scheme, obs_dim=args.obs_dim, auto_follow=args.auto_follow,
-                     max_ep_len=args.max_ep_len, trainning_set=args.trainning_set)
+    env = TradingEnv(data_v=args.data_v, action_scheme_id=args.action_scheme, obs_dim=args.obs_dim, auto_follow=args.auto_follow,
+                     max_ep_len=args.max_ep_len, trainning_set=trainning_set)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack, jump=3, model=args.model)
 
@@ -721,10 +735,10 @@ if __name__ == '__main__':
 
     ppo(lambda: EnvWrapper(env, delay_len=args.delay_len,
                            target_scale=args.target_scale, score_scale=args.score_scale, profit_scale=args.profit_scale,
-                           action_punish=args.ap, target_clip=args.target_clip, start_day=start_day,
-                           start_skip=start_skip,
-                           duration=duration, burn_in=args.burn_in),
+                           action_punish=args.ap, target_clip=args.target_clip, burn_in=args.burn_in),
+        data_v=args.data_v,
         actor_critic=actor_critic,
+        alpha=0.1,
         ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr, ap=args.ap,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name, restore_model=args.restore_model)
