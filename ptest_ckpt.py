@@ -3,8 +3,8 @@ import tensorflow as tf
 import sys
 
 ROOT = osp.abspath(osp.dirname(__file__))
-sys.path.append(ROOT+"/spinningup/")
-from spinup.utils.logx import restore_tf_graph
+sys.path.append(ROOT + "/spinningup/")
+import spinup.algos.tf1.ppo.core as core
 from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
 import argparse
 import os
@@ -17,28 +17,12 @@ parser.add_argument('--num_stack', type=int, default=1)
 parser.add_argument('--test_days', type=int, default=30)
 parser.add_argument('--actions', type=int, default=15)
 parser.add_argument('--obs_dim', type=int, default=26)
-parser.add_argument('--exp_name', type=str, default=None)
-parser.add_argument('--model', type=str, default='tf1_save190.080')
+parser.add_argument('--exp_name', type=str, default='/spinningup/data/')
+parser.add_argument('--model', type=str, default='tf1_save116.0M127.0p')
 args = parser.parse_args()
 
 assert args.num_cpu < 63, "num_cpu should < 63"
 mpi_fork(args.num_cpu)  # run parallel code with mpi
-
-if args.exp_name is not None:
-    fpath = ROOT + "/spinningup/data/" + args.exp_name + '/' + args.exp_name + '_s0/'
-else:
-    fpath = ROOT + "/spinningup/data/"
-fname = osp.join(fpath, args.model)
-
-print('\n\nLoading from %s.\n\n ' % fname)
-# load the things!
-sess = tf.Session()
-model = restore_tf_graph(sess, fname)
-print('Using default action op.')
-action_op = model['pi']
-
-# make function for producing an action given a single state
-get_action = lambda x: sess.run(action_op, feed_dict={model['x']: x[None, :]})[0]
 
 # --------------------------------------------------------------------------
 from spinup import EpochLogger
@@ -50,6 +34,30 @@ logger = EpochLogger()
 if args.num_stack > 1:
     env = FrameStack(env, args.num_stack)
 # env = EnvWrapper(env)
+
+obs_dim = env.observation_space.shape
+act_dim = env.action_space.shape
+
+ac_kwargs=dict(hidden_sizes=[600, 800, 600])
+# Share information about action space with policy architecture
+ac_kwargs['action_space'] = env.action_space
+
+# Inputs to computation graph
+x_ph, a_ph = core.placeholders_from_spaces(env.observation_space, env.action_space)
+
+actor_critic = core.mlp_actor_critic
+# Main outputs from computation graph
+pi, logp, logp_pi, v = actor_critic(x_ph, a_ph, **ac_kwargs)
+
+get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
+
+sess = tf.Session()
+# restore
+fpath = ROOT + "/spinningup/data/"
+saver = tf.train.Saver()
+saver.restore(sess, fpath + '/' + args.model + '/model.ckpt')
+print("******", args.model, "restored! ******")
+# restore end
 
 for start in range(proc_id() + 91, args.test_days + 91, args.num_cpu):
     o, r, d, ep_ret, ep_len = env.reset(start_day=start, start_skip=0), 0, False, 0, 0

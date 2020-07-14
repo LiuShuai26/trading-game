@@ -10,8 +10,8 @@ from collections import deque
 import pandas as pd
 import pickle
 import time
-
-os.chdir(os.path.dirname(os.path.abspath(__file__))+"/rl_game/game/")
+rl_game_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+"/rl_game/game/"
+os.chdir(rl_game_dir)
 
 info_names = [
     "Done", "LastPrice", "BidPrice1", "BidVolume1", "AskPrice1", "AskVolume1", "BidPrice2", "BidVolume2",
@@ -148,6 +148,7 @@ class TradingEnv(gym.Env):
         bid_ask_volume_log_max = 6.42
         total_volume_mean = 120755.66
         total_volume_max = 321988.0
+        # target_abs_mean = 51.018
         target_mean = 2.55
         target_max = 311.0
         price_filter = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23, 24, 28, 30, 32, 36, 38, 40]

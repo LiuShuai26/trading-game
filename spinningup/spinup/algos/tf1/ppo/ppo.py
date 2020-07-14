@@ -6,6 +6,7 @@ import os
 import pickle
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(sys.path[0])))))
+sys.path.append(ROOT)
 sys.path.append(ROOT+'/spinningup')
 from spinup.user_config import DEFAULT_DATA_DIR
 import spinup.algos.tf1.ppo.core as core
@@ -705,9 +706,8 @@ if __name__ == '__main__':
 
     logger_kwargs = setup_logger_kwargs(exp_name, args.seed)
 
-    sys.path.append(ROOT)
-    from trading_env import TradingEnv, FrameStack
-    from wrapper import EnvWrapper
+    from game_env.trading_env import TradingEnv, FrameStack
+    from game_env.wrapper import EnvWrapper
 
     env = TradingEnv(action_scheme_id=args.action_scheme, obs_dim=args.obs_dim, auto_follow=args.auto_follow,
                      max_ep_len=args.max_ep_len, trainning_set=args.trainning_set)
