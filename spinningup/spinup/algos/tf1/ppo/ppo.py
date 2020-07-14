@@ -408,8 +408,8 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
                 test_reward_score += info["reward_score"]
                 test_reward_ap += info["reward_ap"]
 
-                if d or test_len == 3000:   # for fast debug
-                # if d:
+                # if d or test_len == 3000:   # for fast debug
+                if d:
                     logger.store(AverageTestRet=test_ret,
                                  TestRet_target_bias=test_reward_target_bias,
                                  TestRet_score=test_reward_score,
@@ -617,8 +617,8 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         logger.dump_tabular()
         logger.clear_epoch_dict()
 
-        if True:          # for fast debug
-        # if (epoch + 1) % 15 == 0 and tb_target_bias_per_step < 10:
+        # if True:          # for fast debug
+        if (epoch + 1) % 15 == 0 and tb_target_bias_per_step < 10:
             test()
 
             test_ep_ret = logger.get_stats('AverageTestRet')[0]
@@ -672,7 +672,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_v', type=str, default='r12')
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
-    parser.add_argument('--gamma', type=float, default=0.99)
+    parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=8)
     parser.add_argument('--steps', type=int, default=72000)
@@ -684,11 +684,12 @@ if __name__ == '__main__':
     parser.add_argument('--ap', type=float, default=0.4)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=4)
+    parser.add_argument('--target_clip', type=int, default=5)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
-    parser.add_argument('--max_ep_len', type=int, default=1000)
+    parser.add_argument('--max_ep_len', type=int, default=3000)
+    parser.add_argument('--alpha', type=float, default=0)
     parser.add_argument('--exp_name', type=str, default='New')
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
@@ -704,13 +705,13 @@ if __name__ == '__main__':
         trainning_set = 50
 
     exp_name = args.exp_name + "-dataV-" + args.data_v
-    exp_name += "-trainning_set" + str(trainning_set) + "-model" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
+    exp_name += "-trainning_set" + str(trainning_set) + "-model=" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
     exp_name += "-obs_dim" + str(args.obs_dim) + "-as" + str(args.action_scheme)
-    exp_name += "-auto_follow" + str(args.auto_follow) + "-burn_in-" + str(args.burn_in)
+    exp_name += "-auto_follow" + str(args.auto_follow) + "-burn_in" + str(args.burn_in)
     exp_name += "-fs" + str(args.num_stack)
     exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
-    exp_name += "-lr" + str(lr)
+    exp_name += "-alpha" + str(args.alpha) + "-lr" + str(lr)
     if args.restore_model:
         exp_name += "-restore_model" + str(args.restore_model)
 
@@ -738,7 +739,7 @@ if __name__ == '__main__':
                            action_punish=args.ap, target_clip=args.target_clip, burn_in=args.burn_in),
         data_v=args.data_v,
         actor_critic=actor_critic,
-        alpha=0.1,
+        alpha=args.alpha,
         ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr, ap=args.ap,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name, restore_model=args.restore_model)
