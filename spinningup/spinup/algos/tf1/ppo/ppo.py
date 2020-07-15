@@ -7,7 +7,7 @@ import pickle
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(sys.path[0])))))
 sys.path.append(ROOT)
-sys.path.append(ROOT+'/spinningup')
+sys.path.append(ROOT + '/spinningup')
 from spinup.user_config import DEFAULT_DATA_DIR
 import spinup.algos.tf1.ppo.core as core
 from spinup.utils.logx import EpochLogger
@@ -85,7 +85,7 @@ class PPOBuffer:
         self.ptr, self.path_start_idx = 0, 0
         # the next two lines implement the advantage normalization trick
         adv_mean, adv_std = mpi_statistics_scalar(self.adv_buf)
-        self.adv_buf = (self.adv_buf - adv_mean)# / adv_std
+        self.adv_buf = (self.adv_buf - adv_mean)  # / adv_std
         return [self.obs_buf, self.act_buf, self.adv_buf,
                 self.ret_buf, self.logp_buf]
 
@@ -94,7 +94,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, restore_model="tf1_save",
-        exp_name='exp', summary_dir=ROOT+"/tb"):
+        exp_name='exp', summary_dir=ROOT + "/tb"):
     """
     Proximal Policy Optimization (by clipping), 
 
@@ -328,7 +328,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
 
     # # Scheme3: SPPO NO.3: add entropy
     adv_logp = adv_ph - alpha * logp_old_ph
-    min_adv = tf.where(adv_logp>0, (1+clip_ratio)*adv_logp, (1-clip_ratio)*adv_logp)
+    min_adv = tf.where(adv_logp > 0, (1 + clip_ratio) * adv_logp, (1 - clip_ratio) * adv_logp)
     pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_logp, min_adv))
 
     v_loss = tf.reduce_mean((ret_ph - v) ** 2)
@@ -396,7 +396,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         else:
             start_test = 51
         for start_day in range(proc_id() + start_test, 8 + start_test, 8):
-            o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day, burn_in=0), 0, False, 0, 0
+            o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day), 0, False, 0, 0
             test_target_bias, test_reward_target_bias, test_reward_score, test_reward_ap = 0, 0, 0, 0
             while True:
                 a = get_action(o)
@@ -634,7 +634,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
                 # save model if lower than the min_score. min_score start from 150.
                 if test_score < min_score:
                     min_score = test_score
-                    subfolder = '/tf1_save' + str(total_steps//1e6) + 'M' + str(min_score) + 'p'
+                    subfolder = '/tf1_save' + str(total_steps // 1e6) + 'M' + str(min_score) + 'p'
                     save_path = saver.save(sess, logger_kwargs['output_dir'] + subfolder + '/model.ckpt')
                     decayp = {'decay_ap': decay_ap, 'decay_learning_rate': decay_learning_rate}
                     with open(logger_kwargs['output_dir'] + subfolder + "/decayp.pickle", "wb") as pickle_out:
@@ -707,7 +707,7 @@ if __name__ == '__main__':
     exp_name = args.exp_name + "-dataV-" + args.data_v
     exp_name += "-trainning_set" + str(trainning_set) + "-model=" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
     exp_name += "-obs_dim" + str(args.obs_dim) + "-as" + str(args.action_scheme)
-    exp_name += "-auto_follow" + str(args.auto_follow) + "-burn_in" + str(args.burn_in)
+    exp_name += "-auto_follow" + str(args.auto_follow) + "-max_ep_len" + str(args.max_ep_len) + "-burn_in" + str(args.burn_in)
     exp_name += "-fs" + str(args.num_stack)
     exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
@@ -724,8 +724,8 @@ if __name__ == '__main__':
     from game_env.trading_env import TradingEnv, FrameStack
     from game_env.wrapper import EnvWrapper
 
-    env = TradingEnv(data_v=args.data_v, action_scheme_id=args.action_scheme, obs_dim=args.obs_dim, auto_follow=args.auto_follow,
-                     max_ep_len=args.max_ep_len, trainning_set=trainning_set)
+    env = TradingEnv(data_v=args.data_v, action_scheme_id=args.action_scheme, obs_dim=args.obs_dim,
+                     auto_follow=args.auto_follow, max_ep_len=args.max_ep_len, trainning_set=trainning_set)
     if args.num_stack > 1:
         env = FrameStack(env, args.num_stack, jump=3, model=args.model)
 

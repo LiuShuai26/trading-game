@@ -6,8 +6,7 @@ from gym.spaces import Box
 
 
 class EnvWrapper(gym.Wrapper):
-    def __init__(self, env, delay_len=30, target_clip=5, target_scale=1, score_scale=1.5, profit_scale=1.5, action_punish=0.5,
-                 burn_in=3000):
+    def __init__(self, env, delay_len, target_clip, target_scale, score_scale, profit_scale, action_punish, burn_in):
         super(EnvWrapper, self).__init__(env)
         # target
         self.target_diff = deque(maxlen=delay_len)  # target delay setting
@@ -26,32 +25,21 @@ class EnvWrapper(gym.Wrapper):
         self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
                         15: 0, 16: 0}
 
-    def baseline069(self, raw_obs):
-        if raw_obs[26] > raw_obs[27]:
-            action = 6
-        elif raw_obs[26] < raw_obs[27]:
-            action = 9
-        else:
-            action = 0
-        return action
-
     def _env_skip(self, burn_in):
         for _ in range(burn_in):
-            # action_index = self.baseline069(self.raw_obs)
             action_index = 0
-            self.env.expso.Action(self.ctx, self.actions[action_index])
-            self.env.expso.Step(self.ctx)
-        self.env.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
+            self.expso.Action(self.ctx, self.actions[action_index])
+            self.expso.Step(self.ctx)
+        self.expso.GetInfo(self.ctx, self.raw_obs, self.raw_obs_len)
         self.expso.GetReward(self.ctx, self.rewards, self.rewards_len)
 
-    def reset(self, ap=0.4, start_day=None, burn_in=0):
+    def reset(self, ap=0.4, start_day=None):
 
         self.ap = ap
         self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
                         15: 0, 16: 0}
-        if start_day is not None:
-            obs = self.env.reset(start_day=start_day, burn_in=burn_in)
-            self._env_skip(burn_in)
+        if start_day is not None:   # if test specific day set start_skip=0 and burn_in=0
+            obs = self.env.reset(start_day=start_day, start_skip=0, burn_in=0)
         else:
             obs = self.env.reset(burn_in=self.burn_in)
             self._env_skip(self.burn_in)

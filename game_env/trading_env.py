@@ -84,16 +84,17 @@ class TradingEnv(gym.Env):
 
         self.his_price = deque(maxlen=30)
 
-    def reset(self, start_day=None, burn_in=0):
-        # set random seed every time
-        # np.random.seed()
+    def reset(self, start_day=None, start_skip=None, burn_in=0):
+
         # random start_day if no start_day
         if start_day is None:
             start_day = np.random.randint(1, self.trainning_set + 1, 1)[0]  # first self.trainning_set days
-        # random start_skip
-        day_index = start_day - 1
-        max_point = self.data_len[day_index] - self.max_ep_len - burn_in
-        start_skip = int(np.random.randint(0, max_point, 1)[0])
+
+        # random start_skip if no start_skip
+        if start_skip is None:
+            day_index = start_day - 1
+            max_point = self.data_len[day_index] - self.max_ep_len - burn_in - 50
+            start_skip = int(np.random.randint(0, max_point, 1)[0])
 
         start_info = {"date_index": "{} - {}".format(start_day, start_day), "skip_steps": start_skip}
 
@@ -260,11 +261,10 @@ class TradingEnv(gym.Env):
 
         return schemes[action_scheme_id]
 
-    def baseline_policy(self, obs):  # actions: 0,6,9
-        obs = obs[-self.obs_ori_dim:]
-        if obs[24] > obs[25]:
+    def policy_069(self):  # actions: 0,6,9
+        if self.raw_obs[26] > self.raw_obs[27]:
             action = 6
-        elif obs[24] < obs[25]:
+        elif self.raw_obs[26] < self.raw_obs[27]:
             action = 9
         else:
             action = 0
