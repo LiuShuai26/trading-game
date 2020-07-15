@@ -669,7 +669,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_v', type=str, default='r12')
+    parser.add_argument('--data_v', type=str, default='r19')
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
@@ -684,20 +684,19 @@ if __name__ == '__main__':
     parser.add_argument('--ap', type=float, default=0.4)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=5)
+    parser.add_argument('--target_clip', type=int, default=4)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
     parser.add_argument('--max_ep_len', type=int, default=3000)
     parser.add_argument('--alpha', type=float, default=0)
-    parser.add_argument('--exp_name', type=str, default='New')
+    parser.add_argument('--lr', type=float, default=4e-5)
+    parser.add_argument('--exp_name', type=str, default='fix')
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
     assert args.model in ['mlp', 'cnn'], "model must be mlp or cnn"
     assert args.data_v in ['r12', 'r19'], "data version must be r12 or r19"
-
-    lr = 4e-5
 
     if args.data_v == "r19":
         trainning_set = 90
@@ -711,7 +710,7 @@ if __name__ == '__main__':
     exp_name += "-fs" + str(args.num_stack)
     exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
-    exp_name += "-alpha" + str(args.alpha) + "-lr" + str(lr)
+    exp_name += "-alpha" + str(args.alpha) + "-lr" + str(args.lr)
     if args.restore_model:
         exp_name += "-restore_model" + str(args.restore_model)
 
@@ -721,26 +720,27 @@ if __name__ == '__main__':
 
     logger_kwargs = setup_logger_kwargs(exp_name, args.seed)
 
-    from game_env.trading_env import TradingEnv, FrameStack
-    from game_env.wrapper import EnvWrapper
+    from game_env.new_env import TradingEnv, FrameStack
 
     env = TradingEnv(data_v=args.data_v, action_scheme_id=args.action_scheme, obs_dim=args.obs_dim,
-                     auto_follow=args.auto_follow, max_ep_len=args.max_ep_len, trainning_set=trainning_set)
+                     auto_follow=args.auto_follow, max_ep_len=args.max_ep_len, delay_len=args.delay_len,
+                     target_scale=args.target_scale, score_scale=args.score_scale, profit_scale=args.profit_scale,
+                     action_punish=args.ap, target_clip=args.target_clip, burn_in=args.burn_in)
+
     if args.num_stack > 1:
-        env = FrameStack(env, args.num_stack, jump=3, model=args.model)
+        env = FrameStack(env, args.num_stack, jump=5, model=args.model)
 
     if args.model == 'mlp':
         actor_critic = core.mlp_actor_critic
     else:
         actor_critic = core.cnn_actor_critic
 
-    ppo(lambda: EnvWrapper(env, delay_len=args.delay_len,
-                           target_scale=args.target_scale, score_scale=args.score_scale, profit_scale=args.profit_scale,
-                           action_punish=args.ap, target_clip=args.target_clip, burn_in=args.burn_in),
+    ppo(
+        lambda: env,
         data_v=args.data_v,
         actor_critic=actor_critic,
         alpha=args.alpha,
-        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=lr, ap=args.ap,
+        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=args.lr, ap=args.ap,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name, restore_model=args.restore_model)
 

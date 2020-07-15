@@ -46,15 +46,17 @@ data_v19_len = [
 
 class TradingEnv(gym.Env):
 
-    def __init__(self, data_v, action_scheme_id, auto_follow, obs_dim, max_ep_len, trainning_set, render=False):
+    def __init__(self, data_v, action_scheme_id, obs_dim, auto_follow=0, max_ep_len=0, render=False):
         super(TradingEnv, self).__init__()
 
         self.data_v = data_v
 
         if self.data_v == "r19":
             self.data_len = data_v19_len
+            self.trainning_set = 90
         else:
             self.data_len = data_v12_len
+            self.trainning_set = 50
 
         so_file = "./game.so"
         self.expso = ctypes.cdll.LoadLibrary(so_file)
@@ -80,8 +82,6 @@ class TradingEnv(gym.Env):
         self.max_ep_len = max_ep_len
         self.render = render
 
-        self.trainning_set = trainning_set
-
         self.his_price = deque(maxlen=30)
 
     def reset(self, start_day=None, start_skip=None, burn_in=0):
@@ -97,7 +97,7 @@ class TradingEnv(gym.Env):
             start_skip = int(np.random.randint(0, max_point, 1)[0])
 
         start_info = {"date_index": "{} - {}".format(start_day, start_day), "skip_steps": start_skip}
-
+        print(start_info)
         if self.ctx:
             self.close_env()
         self.ctx = self.expso.CreateContext(json.dumps(start_info).encode())

@@ -42,17 +42,17 @@ get_action = lambda x: sess.run(action_op, feed_dict={model['x']: x[None, :]})[0
 
 # --------------------------------------------------------------------------
 from spinup import EpochLogger
-from game_env.trading_env import TradingEnv, FrameStack
-from game_env.wrapper import EnvWrapper
+from game_env.new_env import TradingEnv, FrameStack
 
-env = TradingEnv(action_scheme_id=args.actions, obs_dim=args.obs_dim)
+env = TradingEnv(data_v="r12", action_scheme_id=args.actions, obs_dim=args.obs_dim)
+
 logger = EpochLogger()
 if args.num_stack > 1:
     env = FrameStack(env, args.num_stack)
 # env = EnvWrapper(env)
 
 for start in range(proc_id() + 91, args.test_days + 91, args.num_cpu):
-    o, r, d, ep_ret, ep_len = env.reset(start_day=start, start_skip=0), 0, False, 0, 0
+    o, r, d, ep_ret, ep_len = env.reset(start_day=start), 0, False, 0, 0
     ep_target_bias, ep_apnum = 0, 0
     while True:
         a = get_action(o)
