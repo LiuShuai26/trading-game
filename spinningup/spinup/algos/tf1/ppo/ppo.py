@@ -557,7 +557,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
                 train_data_vars[0]: tb_ep_ret,
                 train_data_vars[1]: tb_ret_target_bias,
                 train_data_vars[2]: tb_ret_score,
-                train_data_vars[3]: tb_ret_score,
+                train_data_vars[3]: tb_ret_profit,
                 train_data_vars[4]: tb_ret_ap,
                 train_data_vars[5]: tb_target_bias,
                 train_data_vars[6]: tb_target_bias_per_step,
