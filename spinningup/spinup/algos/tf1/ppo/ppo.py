@@ -207,6 +207,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         EpRet = tf.Variable(0.)
         EpRet_target_bias = tf.Variable(0.)
         EpRet_score = tf.Variable(0.)
+        EpRet_profit = tf.Variable(0.)
         EpRet_ap = tf.Variable(0.)
         EpTarget_bias = tf.Variable(0.)
         EpTarget_bias_per_step = tf.Variable(0.)
@@ -244,6 +245,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
         summaries.append(tf.summary.scalar("EpRet_score", EpRet_score))
+        summaries.append(tf.summary.scalar("EpRet_profit", EpRet_profit))
         summaries.append(tf.summary.scalar("EpRet_ap", EpRet_ap))
         summaries.append(tf.summary.scalar("EpTarget_bias", EpTarget_bias))
         summaries.append(tf.summary.scalar("EpTarget_bias_per_step", EpTarget_bias_per_step))
@@ -297,7 +299,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         test_summaries.append(tf.summary.scalar("TestScore", TestScore))
 
         train_data_ops = tf.summary.merge(summaries)
-        train_data_vars = [EpRet, EpRet_target_bias, EpRet_score, EpRet_ap, EpTarget_bias, EpTarget_bias_per_step,
+        train_data_vars = [EpRet, EpRet_target_bias, EpRet_score, EpRet_profit, EpRet_ap, EpTarget_bias, EpTarget_bias_per_step,
                            EpScore]
         train_data_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
                             Action10, Action11, Action12, Action13, Action14, Action15, Action16]
@@ -515,6 +517,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         tb_ep_ret = logger.get_stats('AverageEpRet')[0]
         tb_ret_target_bias = logger.get_stats('EpRet_target_bias')[0]
         tb_ret_score = logger.get_stats('EpRet_score')[0]
+        tb_ret_profit = logger.get_stats('EpRet_profit')[0]
         tb_ret_ap = logger.get_stats('EpRet_ap')[0]
         tb_target_bias = logger.get_stats('EpTarget_bias')[0]
         tb_target_bias_per_step = logger.get_stats('EpTarget_bias_per_step')[0]
@@ -594,6 +597,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         logger.log_tabular('AverageEpRet', tb_ep_ret)
         logger.log_tabular('EpRet_target_bias', tb_ret_target_bias)
         logger.log_tabular('EpRet_score', tb_ret_score)
+        logger.log_tabular('EpRet_profit', tb_ret_profit)
         logger.log_tabular('EpRet_ap', tb_ret_ap)
         logger.log_tabular('EpTarget_bias', with_min_and_max=True)
         logger.log_tabular('EpTarget_bias_per_step', tb_target_bias_per_step)
@@ -695,8 +699,9 @@ if __name__ == '__main__':
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
-    assert args.model in ['mlp', 'cnn'], "model must be mlp or cnn"
-    assert args.data_v in ['r12', 'r19'], "data version must be r12 or r19"
+    assert args.model in ['mlp', 'cnn'], "model must be mlp or cnn."
+    assert args.data_v in ['r12', 'r19'], "data version must be r12 or r19."
+    assert args.steps / args.cpu >= args.max_ep_len, "steps/cpu should >= max_ep_len: each cpu at least run one full episode."
 
     if args.data_v == "r19":
         trainning_set = 90
