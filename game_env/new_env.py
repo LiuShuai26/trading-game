@@ -264,6 +264,8 @@ class TradingEnv(gym.Env):
         elif self.obs_dim == 24:
             obs = obs[:25]
             obs = np.delete(obs, [0])
+        elif self.obs_dim == 2:
+            obs = obs[26:28]
         else:
             assert False, "incorrect obs_dim!"
         obs[obs < -1] = -1

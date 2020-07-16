@@ -674,7 +674,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_v', type=str, default='r12')
+    parser.add_argument('--data_v', type=str, default='r12', help="r12 have 62days, r19 have 120days.")
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
@@ -714,9 +714,9 @@ if __name__ == '__main__':
     exp_name += "-obs_dim" + str(args.obs_dim) + "-as" + str(args.action_scheme)
     exp_name += "-auto_follow" + str(args.auto_follow) + "-max_ep_len" + str(args.max_ep_len) + "-burn_in" + str(args.burn_in)
     exp_name += "-fs" + str(args.num_stack)
-    exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ap" + str(args.ap)
+    exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ps" + str(args.profit_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
-    exp_name += "-alpha" + str(args.alpha) + "-lr" + str(args.lr)
+    exp_name += "-gamma" + str(args.gamma) + "-alpha" + str(args.alpha) + "-lr" + str(args.lr)
     if args.restore_model:
         exp_name += "-restore_model" + str(args.restore_model)
 
