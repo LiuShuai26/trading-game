@@ -674,7 +674,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_v', type=str, default='r19')
+    parser.add_argument('--data_v', type=str, default='r12')
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
@@ -689,14 +689,14 @@ if __name__ == '__main__':
     parser.add_argument('--ap', type=float, default=0.4)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=4)
+    parser.add_argument('--target_clip', type=int, default=5)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
     parser.add_argument('--max_ep_len', type=int, default=3000)
     parser.add_argument('--alpha', type=float, default=0)
     parser.add_argument('--lr', type=float, default=4e-5)
-    parser.add_argument('--exp_name', type=str, default='fix')
+    parser.add_argument('--exp_name', type=str, default='allinone')
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
