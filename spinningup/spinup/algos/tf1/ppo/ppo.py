@@ -674,7 +674,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_v', type=str, default='r12', help="r12 have 62days, r19 have 120days.")
+    parser.add_argument('--data_v', type=str, default='r19', help="r12 have 62days, r19 have 120days.")
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
@@ -683,13 +683,14 @@ if __name__ == '__main__':
     parser.add_argument('--steps', type=int, default=72000)
     parser.add_argument('--epochs', type=int, default=3000000)
     parser.add_argument('--num_stack', type=int, default=1)
+    parser.add_argument('--num_stack_jump', type=int, default=5)
     parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1.5)
     parser.add_argument('--profit_scale', type=float, default=0)
     parser.add_argument('--ap', type=float, default=0.4)
     parser.add_argument('--burn_in', type=int, default=3000)
     parser.add_argument('--delay_len', type=int, default=30)
-    parser.add_argument('--target_clip', type=int, default=5)
+    parser.add_argument('--target_clip', type=int, default=2)
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
@@ -713,7 +714,7 @@ if __name__ == '__main__':
     exp_name += "-trainning_set" + str(trainning_set) + "-model=" + args.model + str(args.hidden_sizes)[1:-1].replace(" ", "")
     exp_name += "-obs_dim" + str(args.obs_dim) + "-as" + str(args.action_scheme)
     exp_name += "-auto_follow" + str(args.auto_follow) + "-max_ep_len" + str(args.max_ep_len) + "-burn_in" + str(args.burn_in)
-    exp_name += "-fs" + str(args.num_stack)
+    exp_name += "-fs" + str(args.num_stack) + "-jump" + str(args.num_stack_jump)
     exp_name += "-ts" + str(args.target_scale) + "-ss" + str(args.score_scale) + "-ps" + str(args.profit_scale) + "-ap" + str(args.ap)
     exp_name += "-dl" + str(args.delay_len) + "-clip" + str(args.target_clip)
     exp_name += "-gamma" + str(args.gamma) + "-alpha" + str(args.alpha) + "-lr" + str(args.lr)
@@ -734,7 +735,7 @@ if __name__ == '__main__':
                      action_punish=args.ap, target_clip=args.target_clip, burn_in=args.burn_in)
 
     if args.num_stack > 1:
-        env = FrameStack(env, args.num_stack, jump=5, model=args.model)
+        env = FrameStack(env, args.num_stack, jump=args.num_stack_jump, model=args.model)
 
     if args.model == 'mlp':
         actor_critic = core.mlp_actor_critic
