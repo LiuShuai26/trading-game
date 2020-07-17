@@ -299,8 +299,8 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         test_summaries.append(tf.summary.scalar("TestScore", TestScore))
 
         train_data_ops = tf.summary.merge(summaries)
-        train_data_vars = [EpRet, EpRet_target_bias, EpRet_score, EpRet_profit, EpRet_ap, EpTarget_bias, EpTarget_bias_per_step,
-                           EpScore]
+        train_data_vars = [EpRet, EpRet_target_bias, EpRet_score, EpRet_profit, EpRet_ap, EpTarget_bias,
+                           EpTarget_bias_per_step, EpScore]
         train_data_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
                             Action10, Action11, Action12, Action13, Action14, Action15, Action16]
         train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr, ap]
@@ -324,14 +324,14 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
     # PPO objectives
     ratio = tf.exp(logp - logp_old_ph)  # pi(a|s) / pi_old(a|s)
 
-    # Scheme2: SPPO NO.2: add entropy
-    # min_adv = tf.where(adv_ph > 0, (1 + clip_ratio) * adv_ph, (1 - clip_ratio) * adv_ph)
-    # pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_ph, min_adv) + alpha * h)
-
-    # # Scheme3: SPPO NO.3: add entropy
-    adv_logp = adv_ph - alpha * logp_old_ph
+    # ### Scheme1: SPPO NO.1: add entropy
+    adv_logp = adv_ph - alpha * tf.stop_gradient(logp)
     min_adv = tf.where(adv_logp > 0, (1 + clip_ratio) * adv_logp, (1 - clip_ratio) * adv_logp)
     pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_logp, min_adv))
+
+    ### Scheme2: SPPO NO.2: add entropy
+    # min_adv = tf.where(adv_ph > 0, (1 + clip_ratio) * adv_ph, (1 - clip_ratio) * adv_ph)
+    # pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_ph, min_adv) + tf.stop_gradient(alpha)*h)
 
     v_loss = tf.reduce_mean((ret_ph - v) ** 2)
 
@@ -694,9 +694,9 @@ if __name__ == '__main__':
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26)
     parser.add_argument('--max_ep_len', type=int, default=3000)
-    parser.add_argument('--alpha', type=float, default=0)
+    parser.add_argument('--alpha', type=float, default=0.1)
     parser.add_argument('--lr', type=float, default=4e-5)
-    parser.add_argument('--exp_name', type=str, default='allinone')
+    parser.add_argument('--exp_name', type=str, default='sppo')
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
