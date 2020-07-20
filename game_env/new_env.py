@@ -106,6 +106,8 @@ class TradingEnv(gym.Env):
 
     def _env_skip(self, burn_in):
         for _ in range(burn_in):
+            # a = self.policy_069()
+            # self.expso.Action(self.ctx, a)
             self.expso.Step(self.ctx)
 
     def reset(self, ap=None, start_day=None):
@@ -278,22 +280,22 @@ class TradingEnv(gym.Env):
         schemes = {}
 
         def scheme3(action):
-            assert 0 <= action <= 2 or action == 6 or action == 9, "action should be 0,1,2"
+            assert 0 <= action <= 2 or action == 5 or action == 10, "action should be 0,1,2"
             if action == 1:
                 self.expso.Action(self.ctx, self.actions[18])  # 如果是买动作，卖方向全撤。
-                self.expso.Action(self.ctx, self.actions[6])
+                self.expso.Action(self.ctx, self.actions[5])
             elif action == 2:
                 self.expso.Action(self.ctx, self.actions[15])  # 如果是卖动作，买方向全撤。
-                self.expso.Action(self.ctx, self.actions[9])
+                self.expso.Action(self.ctx, self.actions[10])
             elif action == 0:
                 self.expso.Action(self.ctx, self.actions[action])
             # for auto_clip
-            elif action == 6:
+            elif action == 5:
                 self.expso.Action(self.ctx, self.actions[18])
-                self.expso.Action(self.ctx, self.actions[6])
-            elif action == 9:
+                self.expso.Action(self.ctx, self.actions[5])
+            elif action == 10:
                 self.expso.Action(self.ctx, self.actions[15])
-                self.expso.Action(self.ctx, self.actions[9])
+                self.expso.Action(self.ctx, self.actions[10])
 
         schemes[3] = scheme3
 
