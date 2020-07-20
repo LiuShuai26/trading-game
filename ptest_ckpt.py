@@ -61,7 +61,7 @@ saver.restore(sess, fpath + '/' + args.weights + '/model.ckpt')
 print("******", args.weights, "restored! ******")
 # restore end
 
-for start in range(proc_id() + 91, args.test_days + 91, args.num_cpu):
+for start in range(proc_id() + 1, args.test_days + 1, args.num_cpu):
     o, r, d, ep_ret, ep_len = env.reset(start_day=start), 0, False, 0, 0
     ep_target_bias, ep_apnum = 0, 0
     while True:

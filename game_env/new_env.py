@@ -110,10 +110,13 @@ class TradingEnv(gym.Env):
             # self.expso.Action(self.ctx, a)
             self.expso.Step(self.ctx)
 
-    def reset(self, ap=None, start_day=None):
+    def reset(self, ap=None, ss=None, start_day=None):
 
         if ap is not None:
             self.ap = ap
+        if ss is not None:
+            self.score_scale = ss
+
         self.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
                         15: 0, 16: 0}
 

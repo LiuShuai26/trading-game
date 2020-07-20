@@ -91,7 +91,7 @@ class PPOBuffer:
 
 
 def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs=dict(), seed=0,
-        steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4,
+        steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, lr=3e-4, ap=0.4, ss=1.5,
         train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=3000,
         target_kl=0.01, logger_kwargs=dict(), save_freq=25e6, restore_model="tf1_save",
         exp_name='exp', summary_dir=ROOT + "/tb"):
@@ -200,7 +200,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
     # Every step, get: action, value, and logprob
     get_action_ops = [pi, v, logp_pi, h]
 
-    # Tensorflow Summary Ops
+    # Tensorflow Summary Ops (tbs)
     def build_summaries():
         summaries = []
 
@@ -241,6 +241,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         ClipFrac = tf.Variable(0.)
         lr = tf.Variable(0.)
         ap = tf.Variable(0.)
+        ss = tf.Variable(0.)
 
         summaries.append(tf.summary.scalar("Reward", EpRet))
         summaries.append(tf.summary.scalar("EpRet_target_bias", EpRet_target_bias))
@@ -279,6 +280,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         summaries.append(tf.summary.scalar("ClipFrac", ClipFrac))
         summaries.append(tf.summary.scalar("lr", lr))
         summaries.append(tf.summary.scalar("ap", ap))
+        summaries.append(tf.summary.scalar("ss", ss))
 
         test_summaries = []
 
@@ -303,7 +305,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
                            EpTarget_bias_per_step, EpScore]
         train_data_vars += [Action0, Action1, Action2, Action3, Action4, Action5, Action6, Action7, Action8, Action9,
                             Action10, Action11, Action12, Action13, Action14, Action15, Action16]
-        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr, ap]
+        train_data_vars += [VVals, LossPi, LossV, DeltaLossPi, DeltaLossV, Entropy, KL, ClipFrac, lr, ap, ss]
 
         test_data_ops = tf.summary.merge(test_summaries)
         test_data_vars = [TestRet, TestRet_target_bias, TestRet_score, TestRet_ap, TestTarget_bias,
@@ -389,7 +391,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         logger.store(LossPi=pi_l_old, LossV=v_l_old,
                      KL=kl, Entropy=ent, ClipFrac=cf,
                      DeltaLossPi=(pi_l_new - pi_l_old),
-                     DeltaLossV=(v_l_new - v_l_old), lr=decay_learning_rate, ap=decay_ap)
+                     DeltaLossV=(v_l_new - v_l_old), lr=decay_learning_rate, ap=decay_ap, ss=inc_ss)
 
     def test():
         get_action = lambda x: sess.run(pi, feed_dict={x_ph: x[None, :]})[0]
@@ -398,7 +400,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         else:
             start_test = 51
         for start_day in range(proc_id() + start_test, 8 + start_test, 8):
-            o, r, d, test_ret, test_len = env.reset(ap=decay_ap, start_day=start_day), 0, False, 0, 0
+            o, r, d, test_ret, test_len = env.reset(start_day=start_day), 0, False, 0, 0
             test_target_bias, test_reward_target_bias, test_reward_score, test_reward_ap = 0, 0, 0, 0
             while True:
                 a = get_action(o)
@@ -423,21 +425,23 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
                     print("Day", start_day, "Len:", test_len, "Profit:", info["profit"], "Score:", info["score"])
                     break
         # after test we need reset the env
-        o, ep_ret, ep_len = env.reset(ap=decay_ap), 0, 0
+        o, ep_ret, ep_len = env.reset(ap=decay_ap, ss=inc_ss), 0, 0
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len = env.reset(ap=ap), 0, False, 0, 0
+    o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     ep_target_bias, ep_reward_target_bias, ep_score, ep_reward_score, ep_reward_profit, ep_reward_ap = 0, 0, 0, 0, 0, 0
 
     min_score = 150
 
     if restore_model:
-        with open(DEFAULT_DATA_DIR + '/' + restore_model + '/decayp.pickle', "rb") as pickle_in:
-            decayp = pickle.load(pickle_in)
-            ap = decayp['decay_ap']
-            lr = decayp['decay_learning_rate']
-            print("****** decay parameters restored! lr:", lr, "ap:", ap, "******")
+        with open(DEFAULT_DATA_DIR + '/' + restore_model + '/parameter.pickle', "rb") as pickle_in:
+            parameter = pickle.load(pickle_in)
+            ap = parameter['decay_ap']
+            ss = parameter['inc_ss']
+            lr = parameter['decay_learning_rate']
+            print("****** decay parameters restored! lr:", lr, "ap:", ap, "ss:", ss, "******")
     decay_ap = ap
+    inc_ss = ss
 
     # Main loop: collect experience in env and update/log each epoch
     for epoch in range(epochs):
@@ -500,7 +504,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
                                  )
 
                 # if d:
-                o = env.reset(ap=decay_ap)
+                o = env.reset(ap=decay_ap, ss=inc_ss)
                 # env.act_sta = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0}
                 ep_ret, ep_reward_target_bias, ep_reward_score, ep_reward_profit, ep_reward_ap = 0, 0, 0, 0, 0
                 ep_target_bias, ep_score, ep_len = 0, 0, 0
@@ -509,6 +513,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
 
         decay_ap = ap * (0.9 ** (epoch // 35))
         decay_learning_rate = max(lr * (0.96 ** (epoch // 35)), 3e-6)
+        inc_ss = min(ss * (1.04 ** (epoch // 15)), 10)
 
         # Perform PPO update!
         update(epoch)
@@ -551,6 +556,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         tb_clipfrac = logger.get_stats('ClipFrac')[0]
         tb_lr = logger.get_stats('lr')[0]
         tb_ap = logger.get_stats('ap')[0]
+        tb_ss = logger.get_stats('ss')[0]
 
         if proc_id() == 0:
             summary_str = sess.run(train_data_ops, feed_dict={
@@ -589,6 +595,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
                 train_data_vars[32]: tb_clipfrac,
                 train_data_vars[33]: tb_lr,
                 train_data_vars[34]: tb_ap,
+                train_data_vars[35]: tb_ss,
             })
             writer.add_summary(summary_str, total_steps)
             writer.flush()
@@ -615,6 +622,7 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
         logger.log_tabular('ClipFrac', average_only=True)
         logger.log_tabular('lr', average_only=True)
         logger.log_tabular('ap', average_only=True)
+        logger.log_tabular('ss', average_only=True)
         logger.log_tabular('StopIter', average_only=True)
         logger.log_tabular('Time', time.time() - start_time)
         logger.log_tabular('EnvInteractsSpeed', ((epoch + 1) * steps_per_epoch) / (time.time() - start_time))
@@ -641,9 +649,9 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
                     min_score = test_score
                     subfolder = '/tf1_save' + str(total_steps // 1e6) + 'M' + str(min_score) + 'p'
                     save_path = saver.save(sess, logger_kwargs['output_dir'] + subfolder + '/model.ckpt')
-                    decayp = {'decay_ap': decay_ap, 'decay_learning_rate': decay_learning_rate}
-                    with open(logger_kwargs['output_dir'] + subfolder + "/decayp.pickle", "wb") as pickle_out:
-                        pickle.dump(decayp, pickle_out)
+                    parameter = {'decay_ap': decay_ap, 'inc_ss': inc_ss, 'decay_learning_rate': decay_learning_rate}
+                    with open(logger_kwargs['output_dir'] + subfolder + "/parameter.pickle", "wb") as pickle_out:
+                        pickle.dump(parameter, pickle_out)
                     print("Model saved in path: %s" % save_path)
 
                 summary_str = sess.run(test_data_ops, feed_dict={
@@ -674,13 +682,13 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_v', type=str, default='r19', help="r12 have 62days, r19 have 120days.")
+    parser.add_argument('--data_v', type=str, default='r12', help="r12 have 62days, r19 have 120days.")
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=8)
-    parser.add_argument('--steps', type=int, default=72000)
+    parser.add_argument('--steps', type=int, default=80000)
     parser.add_argument('--epochs', type=int, default=3000000)
     parser.add_argument('--num_stack', type=int, default=1)
     parser.add_argument('--num_stack_jump', type=int, default=3)
@@ -694,7 +702,7 @@ if __name__ == '__main__':
     parser.add_argument('--auto_follow', type=int, default=0)
     parser.add_argument('--action_scheme', type=int, default=15)
     parser.add_argument('--obs_dim', type=int, default=26, help="26 without alive info, 38 with alive info.")
-    parser.add_argument('--max_ep_len', type=int, default=3000)
+    parser.add_argument('--max_ep_len', type=int, default=5000)
     parser.add_argument('--alpha', type=float, default=0, help="alpha > 0 enable sppo.")
     parser.add_argument('--lr', type=float, default=4e-5)
     parser.add_argument('--exp_name', type=str, default='r19base')
@@ -747,7 +755,7 @@ if __name__ == '__main__':
         data_v=args.data_v,
         actor_critic=actor_critic,
         alpha=args.alpha,
-        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=args.lr, ap=args.ap,
+        ac_kwargs=dict(hidden_sizes=args.hidden_sizes), gamma=args.gamma, lr=args.lr, ap=args.ap, ss=args.score_scale,
         seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, max_ep_len=args.max_ep_len,
         logger_kwargs=logger_kwargs, exp_name=exp_name, restore_model=args.restore_model)
 
