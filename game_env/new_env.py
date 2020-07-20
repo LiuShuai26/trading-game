@@ -400,8 +400,8 @@ class FrameStack(gym.Wrapper):
             self.observation_space = Box(-np.inf, np.inf, shape=(frame_stack, self.env.observation_space.shape[0]),
                                          dtype=np.float32)
 
-    def reset(self, ap=None, start_day=None):
-        ob = self.env.reset(ap=ap, start_day=start_day)
+    def reset(self, ap=None, ss=None, start_day=None):
+        ob = self.env.reset(ap=ap, ss=ss, start_day=start_day)
         ob = np.float32(ob)
         for _ in range(self.total_frame):
             self.frames.append(ob)
