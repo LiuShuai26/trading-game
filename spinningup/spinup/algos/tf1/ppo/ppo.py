@@ -327,13 +327,13 @@ def ppo(env_fn, data_v, actor_critic=core.mlp_actor_critic, alpha=0.0, ac_kwargs
     ratio = tf.exp(logp - logp_old_ph)  # pi(a|s) / pi_old(a|s)
 
     # Scheme1: SPPO add entropy
-    adv_logp = adv_ph - alpha * tf.stop_gradient(logp)
-    min_adv = tf.where(adv_logp > 0, (1 + clip_ratio) * adv_logp, (1 - clip_ratio) * adv_logp)
-    pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_logp, min_adv))
+    # adv_logp = adv_ph - alpha * tf.stop_gradient(logp)
+    # min_adv = tf.where(adv_logp > 0, (1 + clip_ratio) * adv_logp, (1 - clip_ratio) * adv_logp)
+    # pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_logp, min_adv))
 
     # Scheme2: SPPO add entropy
-    # min_adv = tf.where(adv_ph > 0, (1 + clip_ratio) * adv_ph, (1 - clip_ratio) * adv_ph)
-    # pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_ph, min_adv) + tf.stop_gradient(alpha)*h)
+    min_adv = tf.where(adv_ph > 0, (1 + clip_ratio) * adv_ph, (1 - clip_ratio) * adv_ph)
+    pi_loss = -tf.reduce_mean(tf.minimum(ratio * adv_ph, min_adv) + alpha*h)
 
     v_loss = tf.reduce_mean((ret_ph - v) ** 2)
 
@@ -682,30 +682,30 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_v', type=str, default='r12', help="r12 have 62days, r19 have 120days.")
-    parser.add_argument('--model', type=str, default='mlp')
+    parser.add_argument('--data_v', type=str, choices=['r12', 'r19'], default='r12', help="r12 have 62days, r19 have 120days.")
+    parser.add_argument('--model', type=str, choices=['mlp', 'cnn'], default='mlp')
     parser.add_argument('--hidden_sizes', nargs='+', type=int, default=[600, 800, 600])
     parser.add_argument('--gamma', type=float, default=0.998)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--cpu', type=int, default=8)
     parser.add_argument('--steps', type=int, default=80000)
     parser.add_argument('--epochs', type=int, default=3000000)
-    parser.add_argument('--num_stack', type=int, default=1)
+    parser.add_argument('--num_stack', type=int, default=2)
     parser.add_argument('--num_stack_jump', type=int, default=3)
     parser.add_argument('--target_scale', type=float, default=1)
     parser.add_argument('--score_scale', type=float, default=1.5)
     parser.add_argument('--profit_scale', type=float, default=0)
     parser.add_argument('--ap', type=float, default=0.4)
-    parser.add_argument('--burn_in', type=int, default=3000)
+    parser.add_argument('--burn_in', type=int, default=5000)
     parser.add_argument('--delay_len', type=int, default=30)
     parser.add_argument('--target_clip', type=int, default=5)
     parser.add_argument('--auto_follow', type=int, default=0)
-    parser.add_argument('--action_scheme', type=int, default=15)
-    parser.add_argument('--obs_dim', type=int, default=26, help="26 without alive info, 38 with alive info.")
+    parser.add_argument('--action_scheme', type=int, choices=[3, 15], default=3)
+    parser.add_argument('--obs_dim', type=int, choices=[26, 38], default=26, help="26 without alive info, 38 with alive info.")
     parser.add_argument('--max_ep_len', type=int, default=5000)
     parser.add_argument('--alpha', type=float, default=0, help="alpha > 0 enable sppo.")
     parser.add_argument('--lr', type=float, default=4e-5)
-    parser.add_argument('--exp_name', type=str, default='r19base')
+    parser.add_argument('--exp_name', type=str, default='inc_ss')
     parser.add_argument('--restore_model', type=str, default="")
     args = parser.parse_args()
 
